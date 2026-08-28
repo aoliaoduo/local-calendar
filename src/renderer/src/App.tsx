@@ -51,41 +51,42 @@ export default function App() {
     setCalendars(await api.listCalendars())
   }, [])
 
-  const loadEvents = useCallback(async () => {
+  const getVisibleRange = useCallback(() => {
     const from = (view === 'year' ? cursor.startOf('year') : cursor.startOf('month').minus({ months: 2 })).toFormat('yyyy-MM-dd')
     const to = (view === 'year' ? cursor.endOf('year') : cursor.endOf('month').plus({ months: 2 })).toFormat('yyyy-MM-dd')
-    setEvents(await api.listEvents(from, to))
+    return { from, to }
   }, [cursor, view])
+
+  const loadEvents = useCallback(async () => {
+    const { from, to } = getVisibleRange()
+    setEvents(await api.listEvents(from, to))
+  }, [getVisibleRange])
 
   const loadTasks = useCallback(async () => {
     setTasks(await api.listTasks('all'))
   }, [])
 
   const loadTaskOccurrences = useCallback(async () => {
-    const from = (view === 'year' ? cursor.startOf('year') : cursor.startOf('month').minus({ months: 2 })).toFormat('yyyy-MM-dd')
-    const to = (view === 'year' ? cursor.endOf('year') : cursor.endOf('month').plus({ months: 2 })).toFormat('yyyy-MM-dd')
+    const { from, to } = getVisibleRange()
     setTaskOccurrences(await api.listTaskOccurrences(from, to))
-  }, [cursor, view])
+  }, [getVisibleRange])
 
-  useEffect(() => {
-    void loadCalendars()
-  }, [loadCalendars])
+  const loadBootstrap = useCallback(async () => {
+    const { from, to } = getVisibleRange()
+    const snapshot = await api.bootstrap(from, to)
+    setCalendars(snapshot.calendars)
+    setEvents(snapshot.events)
+    setTasks(snapshot.tasks)
+    setTaskOccurrences(snapshot.taskOccurrences)
+  }, [getVisibleRange])
 
   useEffect(() => {
     void window.calendarApi.getNotificationSettings().then((settings) => setNotificationsEnabled(settings.notificationsEnabled)).catch(() => {})
   }, [])
 
   useEffect(() => {
-    void loadEvents()
-  }, [loadEvents])
-
-  useEffect(() => {
-    void loadTasks()
-  }, [loadTasks])
-
-  useEffect(() => {
-    void loadTaskOccurrences()
-  }, [loadTaskOccurrences])
+    void loadBootstrap()
+  }, [loadBootstrap])
 
   useEffect(() => {
     const w = window as unknown as { __setView?: (v: ViewKind) => void; __openCreate?: () => void; __openTasks?: () => void; __openTarget?: (kind: 'event' | 'task', id: string) => void }
@@ -141,13 +142,10 @@ export default function App() {
 
   useEffect(() => {
     const off = window.calendarApi.onDataChanged(() => {
-      void loadCalendars()
-      void loadEvents()
-      void loadTasks()
-      void loadTaskOccurrences()
+      void loadBootstrap()
     })
     return off
-  }, [loadCalendars, loadEvents, loadTasks, loadTaskOccurrences])
+  }, [loadBootstrap])
 
   useEffect(() => window.calendarApi.onAppToast((payload) => {
     const item: AppToastInfo = typeof payload === 'string' ? { message: payload } : payload

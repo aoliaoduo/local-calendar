@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.2
+
+- Reduced renderer startup IPC round trips with a single bootstrap snapshot.
+
 ## 2.1.1
 
 - Added a detailed wide editor for double-click timeline creation while preserving quick single-click creation.

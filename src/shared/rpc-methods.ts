@@ -17,6 +17,7 @@ export function createMethodTable(svc: CalendarService): MethodTable {
   }
 
   register('calendars.list', false, () => svc.listCalendars())
+  register('app.bootstrap', false, (p) => svc.getBootstrap(p.from as string | undefined, p.to as string | undefined))
   register('calendars.create', true, (p) => svc.createCalendar(p as never))
   register('calendars.update', true, (p) =>
     svc.updateCalendar(p.id as string, p.patch as { name?: string; color?: string; isVisible?: boolean })

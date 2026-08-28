@@ -89,6 +89,7 @@ export interface TrashInfo {
 }
 
 export const api = {
+  bootstrap: (from?: string, to?: string) => rpc<{ calendars: CalendarInfo[]; events: EventInfo[]; tasks: TaskInfo[]; taskOccurrences: TaskInfo[] }>('app.bootstrap', { from, to }),
   listCalendars: () => rpc<CalendarInfo[]>('calendars.list'),
   createCalendar: (input: { name: string; color?: string }) => rpc<CalendarInfo>('calendars.create', input),
   updateCalendar: (id: string, patch: { name?: string; color?: string; isVisible?: boolean }) =>

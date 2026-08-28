@@ -259,6 +259,15 @@ export class CalendarService {
     this.db = db
   }
 
+  getBootstrap(from?: string, to?: string): { calendars: Calendar[]; events: CalendarEvent[]; tasks: Task[]; taskOccurrences: Task[] } {
+    return {
+      calendars: this.listCalendars(),
+      events: this.listEvents(from, to),
+      tasks: this.listTasks({ status: 'all' }),
+      taskOccurrences: this.listTaskOccurrences(from, to)
+    }
+  }
+
   async backupTo(destination: string): Promise<void> {
     await this.db.backup(destination)
   }
