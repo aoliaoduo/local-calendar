@@ -14,7 +14,7 @@ npm test        # 构建并运行共享服务冒烟测试（含提醒边界）
 
 生产模式：`npm run build && npm start`
 
-Windows 便携版：`npm run dist:win`。如果网络需要本机代理，可用 `npm run dist:win:proxy`。生成的 `Local Calendar-<版本>-portable.exe` 可直接复制到任意文件夹运行；首次启动会解压运行环境，可能需要十几秒，之后启动会更快。数据库、设置、日志、截图和 RPC 文件都保存在同目录的 `data` 文件夹中，删除整个文件夹即可卸载。
+Windows 便携版：`npm run dist:win`。如果网络需要本机代理，可用 `npm run dist:win:proxy`。只生成 `Local Calendar-<版本>-portable.zip`，解压后直接运行目录中的程序；数据库、设置、日志、截图和 RPC 文件都保存在程序同目录的 `data` 文件夹中，删除整个文件夹即可卸载。
 
 ## CLI（命令行 / AI 操作入口）
 

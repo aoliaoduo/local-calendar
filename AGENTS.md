@@ -11,7 +11,7 @@ Windows-only portable Electron calendar with local SQLite storage, tasks, remind
 - `npm run typecheck` runs TypeScript checks.
 - `npm run build` builds main, preload, and renderer bundles.
 - `npm test` builds and runs shared-service smoke tests.
-- `npm run dist:win:proxy` builds the Windows portable executable through the configured local proxy.
+- `npm run dist:win:proxy` builds the Windows portable zip through the configured local proxy.
 
 ## Data
 

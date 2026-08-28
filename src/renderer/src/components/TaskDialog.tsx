@@ -14,7 +14,7 @@ export default function TaskDialog({ task, occurrenceIndex, occurrenceDue, onClo
   const [title, setTitle] = useState(task.title)
   const [due, setDue] = useState((occurrenceDue || task.dueAt) ? DateTime.fromISO(occurrenceDue || task.dueAt!).toLocal().toFormat('yyyy-MM-dd') : '')
   const [notes, setNotes] = useState(task.notes ?? '')
-  const [reminder, setReminder] = useState(task.reminderMinutes === null ? '' : String(task.reminderMinutes))
+  const [reminder, setReminder] = useState(task.reminderMinutes === null ? (task.dueAt ? '900' : '') : String(task.reminderMinutes))
   const [priority, setPriority] = useState(String(task.priority ?? 0))
   const [rrule, setRrule] = useState(task.rrule ?? '')
   const [editScope, setEditScope] = useState<'occurrence' | 'series'>(occurrenceIndex === undefined ? 'series' : 'occurrence')
@@ -52,7 +52,7 @@ export default function TaskDialog({ task, occurrenceIndex, occurrenceDue, onClo
         <input className="task-dialog-title" autoFocus value={title} placeholder="任务标题" onChange={(event) => setTitle(event.target.value)} />
         <label className="task-dialog-field"><span className="material-icons">event</span><span>截止日期</span><input type="date" value={due} onChange={(event) => setDue(event.target.value)} /></label>
         {occurrenceIndex !== undefined && <label className="task-dialog-field"><span className="material-icons">event_repeat</span><span>应用范围</span><select value={editScope} onChange={(event) => { const next = event.target.value as 'occurrence' | 'series'; setEditScope(next); const value = next === 'series' ? task.dueAt : occurrenceDue; setDue(value ? DateTime.fromISO(value).toLocal().toFormat('yyyy-MM-dd') : '') }}><option value="occurrence">仅此任务</option><option value="series">整个系列</option></select></label>}
-        <label className="task-dialog-field"><span className="material-icons">notifications</span><span>提醒</span><select value={reminder} onChange={(event) => setReminder(event.target.value)}><option value="">不提醒</option><option value="0">截止时提醒</option><option value="10">提前 10 分钟</option><option value="30">提前 30 分钟</option><option value="60">提前 1 小时</option></select></label>
+        <label className="task-dialog-field"><span className="material-icons">notifications</span><span>提醒</span><select value={reminder} onChange={(event) => setReminder(event.target.value)}><option value="">不提醒</option><option value="900">当天 09:00</option><option value="0">截止时提醒</option><option value="10">提前 10 分钟</option><option value="30">提前 30 分钟</option><option value="60">提前 1 小时</option></select></label>
         <label className="task-dialog-field"><span className="material-icons">priority_high</span><span>优先级</span><select value={priority} onChange={(event) => setPriority(event.target.value)}><option value="1">高</option><option value="0">普通</option><option value="-1">低</option></select></label>
         <label className="task-dialog-field"><span className="material-icons">repeat</span><span>重复</span><select value={rrule} onChange={(event) => setRrule(event.target.value)}><option value="">不重复</option><option value="FREQ=DAILY">每天</option><option value="FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR">每个工作日</option><option value="FREQ=WEEKLY">每周</option><option value="FREQ=MONTHLY">每月</option><option value="FREQ=YEARLY">每年</option></select></label>
         <label className="task-dialog-check"><input type="checkbox" checked={completed} onChange={(event) => setCompleted(event.target.checked)} />已完成</label>

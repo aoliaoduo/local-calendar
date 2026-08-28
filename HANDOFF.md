@@ -38,7 +38,7 @@ Repository: https://github.com/aoliaoduo/local-calendar
 2. Add task list grouping and drag sorting.
 3. Add notification settings and startup behavior controls.
 4. Expand automated tests to scheduler integration (the current smoke suite covers reminders, trash, task recurrence, sorting, explicit paths, and legacy migration).
-5. Keep release artifacts out of Git; only the latest portable executable belongs in the release folder.
+5. Keep release artifacts out of Git; only the latest portable zip belongs in the release folder.
 
 ## Verification
 
@@ -46,6 +46,7 @@ Run `npm run typecheck`, `npm test`, `npm run build`, and `npm run dist:win:prox
 
 ## Release Checklist
 
-- Verify the portable executable starts on Windows 10 with an app-local `data` directory.
+- Verify the portable zip starts on Windows 10 with an app-local `data` directory after extraction.
 - Run `localcal doctor --json` against the same directory used by the portable build.
 - Keep `release/`, `portable-*`, `data/`, and `out/` out of Git commits.
+- Packaging is zip-only; do not generate or publish portable `.exe` artifacts.

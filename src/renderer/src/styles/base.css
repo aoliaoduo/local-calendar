@@ -34,6 +34,16 @@
   --blue-soft: #172943;
 }
 
+:root[data-theme='dark'] *::-webkit-scrollbar-thumb {
+  background: rgba(150, 170, 200, 0.34);
+  background-clip: content-box;
+}
+
+:root[data-theme='dark'] *::-webkit-scrollbar-thumb:hover {
+  background: rgba(170, 190, 220, 0.56);
+  background-clip: content-box;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -57,8 +67,8 @@
 }
 
 *::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+  width: 8px;
+  height: 8px;
 }
 
 *::-webkit-scrollbar-track {
@@ -67,14 +77,14 @@
 
 *::-webkit-scrollbar-thumb {
   min-height: 40px;
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   border-radius: 8px;
-  background: #9aa0a6;
+  background: rgba(95, 99, 104, 0.48);
   background-clip: content-box;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: #70757a;
+  background: rgba(95, 99, 104, 0.72);
   background-clip: content-box;
 }
 
@@ -1092,6 +1102,24 @@ select {
 :root[data-theme='dark'] .task-dialog {
   background: #101722;
   color: var(--text-1);
+}
+
+@media (max-width: 1100px) {
+  .sidebar { width: 220px; }
+  .tasks-panel { width: 280px; }
+  .topbar { padding: 0 8px; }
+  .topbar > *:not(.window-drag-region) { gap: 12px; }
+  .topbar-right { gap: 2px !important; }
+  .title-sub { display: none; }
+}
+
+@media (max-width: 880px) {
+  .sidebar { width: 200px; }
+  .tasks-panel { width: 250px; margin-right: 6px; }
+  .logo-text { display: none; }
+  .topbar-right > .icon-btn[title='应用信息'] { display: none; }
+  .today-btn { padding: 0 8px; }
+  .view-select { padding-left: 8px; }
 }
 
 .settings-head,

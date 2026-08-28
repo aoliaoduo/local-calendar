@@ -13,7 +13,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const [newTitle, setNewTitle] = useState('')
   const today = DateTime.now().toISODate()!
   const [newDue, setNewDue] = useState(today)
-  const [newReminder, setNewReminder] = useState('')
+  const [newReminder, setNewReminder] = useState('900')
   const [newPriority, setNewPriority] = useState('0')
   const [newRrule, setNewRrule] = useState('')
   const [showDone, setShowDone] = useState(false)
@@ -56,7 +56,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
     await api.createTask({ title, dueAt: newDue || undefined, reminderMinutes: newReminder === '' ? null : Number(newReminder), priority: Number(newPriority), rrule: newRrule || null })
     setNewTitle('')
     setNewDue(today)
-    setNewReminder('')
+    setNewReminder('900')
     setNewPriority('0')
     setNewRrule('')
     setAdding(false)
@@ -194,6 +194,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
             <input type="date" value={editDue} onChange={(event) => setEditDue(event.target.value)} />
             <select value={editReminder} onChange={(event) => setEditReminder(event.target.value)}>
               <option value="">不提醒</option>
+              <option value="900">当天 09:00</option>
               <option value="0">截止时提醒</option>
               <option value="10">提前 10 分钟</option>
               <option value="30">提前 30 分钟</option>
@@ -294,6 +295,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
             </div>
             <select className="task-add-reminder" value={newReminder} onChange={(event) => setNewReminder(event.target.value)}>
               <option value="">不提醒</option>
+              <option value="900">当天 09:00</option>
               <option value="0">截止时提醒</option>
               <option value="10">提前 10 分钟</option>
               <option value="30">提前 30 分钟</option>

@@ -169,8 +169,8 @@ function createWindow(): void {
     width: saved.width ?? Math.min(1440, workArea.width),
     height: saved.height ?? Math.min(860, workArea.height),
     ...(typeof saved.x === 'number' && typeof saved.y === 'number' ? { x: saved.x, y: saved.y } : {}),
-    minWidth: 1024,
-    minHeight: 680,
+    minWidth: 760,
+    minHeight: 520,
     center: true,
     backgroundColor: '#ffffff',
     autoHideMenuBar: true,
@@ -391,7 +391,9 @@ function checkReminders(): void {
     if (!task.dueAt || task.reminderMinutes === null) continue
     const dueAt = DateTime.fromISO(task.dueAt)
     if (!dueAt.isValid) continue
-    const fireAt = dueAt.minus({ minutes: task.reminderMinutes })
+    const fireAt = task.reminderMinutes === 900
+      ? dueAt.toLocal().startOf('day').plus({ hours: 9 })
+      : dueAt.minus({ minutes: task.reminderMinutes })
     const key = `task|${task.id}|${task.updatedAt}|${task.reminderMinutes}`
     if (firedReminders.has(key)) continue
     if (isReminderDue(now, fireAt)) {

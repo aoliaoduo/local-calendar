@@ -96,8 +96,8 @@ export default function EventDialog({ state, calendars, onClose, onSaved }: Even
   const [location, setLocation] = useState(existing?.location ?? '')
   const [repeat, setRepeat] = useState(repeatValue(existing?.rrule))
   const [editScope, setEditScope] = useState<'occurrence' | 'series'>(state?.mode === 'edit' && state.occurrenceIndex !== undefined ? 'occurrence' : 'series')
-  const [reminders, setReminders] = useState<ReminderInfo[]>(() => normalizeReminders(existing?.reminders))
-  const [reminderMinutes, setReminderMinutes] = useState(String(10))
+  const [reminders, setReminders] = useState<ReminderInfo[]>(() => existing ? normalizeReminders(existing.reminders) : [{ minutes: 0, method: 'popup' }])
+  const [reminderMinutes, setReminderMinutes] = useState(String(0))
   const [error, setError] = useState('')
 
   if (!state) return null

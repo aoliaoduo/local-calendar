@@ -1728,6 +1728,14 @@
   color: var(--text-1);
 }
 
+@media (max-width: 1100px) {
+  .tasks-panel { width: 280px; }
+}
+
+@media (max-width: 880px) {
+  .tasks-panel { width: 250px; margin-right: 6px; }
+}
+
 .tasks-done-toggle .material-icons {
   font-size: 18px;
 }

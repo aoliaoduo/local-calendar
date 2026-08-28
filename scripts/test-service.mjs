@@ -53,6 +53,7 @@ calendar.restoreTrash(deletedEvent.id)
 assert.equal(calendar.getEvent(reminderEvent.id)?.title, 'reminder')
 
 const recurring = calendar.createTask({ title: 'repeat', dueAt: '2026-08-29', rrule: 'DAILY' })
+assert.equal(recurring.reminderMinutes, 900)
 const occurrences = calendar.listTaskOccurrences('2026-08-29', '2026-09-01')
 assert.equal(occurrences.filter((task) => task.id.startsWith(`${recurring.id}#`)).length, 4)
 calendar.deleteTaskOccurrence(recurring.id, 1)

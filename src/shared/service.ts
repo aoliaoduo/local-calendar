@@ -560,7 +560,9 @@ export class CalendarService {
     const now = nowIso()
     const reminderMinutes = input.reminderMinutes !== undefined && input.reminderMinutes !== null
       ? normalizeTaskReminder(input.reminderMinutes)
-      : null
+      : input.reminderMinutes === undefined && /^\d{4}-\d{2}-\d{2}$/.test(input.dueAt?.trim() || '')
+        ? 900
+        : null
     const priority = normalizeTaskPriority(input.priority)
     this.db
       .prepare('INSERT INTO tasks (id, title, notes, due_at, reminder_minutes, priority, sort_order, rrule, exdates, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
