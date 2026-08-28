@@ -137,7 +137,7 @@
 
 .wk-head {
   display: grid;
-  grid-template-columns: 72px repeat(var(--cols), 1fr);
+  grid-template-columns: 88px repeat(var(--cols), 1fr);
   border-bottom: 1px solid var(--divider);
   flex-shrink: 0;
   background: #fff;
@@ -211,7 +211,7 @@
 
 .wk-allday {
   display: grid;
-  grid-template-columns: 72px 1fr;
+  grid-template-columns: 88px 1fr;
   border-bottom: 1px solid var(--divider);
   flex-shrink: 0;
   min-height: 0;
@@ -247,7 +247,7 @@
 .wk-grid {
   position: relative;
   display: grid;
-  grid-template-columns: 72px repeat(var(--cols), 1fr);
+  grid-template-columns: 88px repeat(var(--cols), 1fr);
   height: 1152px;
 }
 
@@ -257,10 +257,11 @@
 
 .wk-times .h-label {
   position: absolute;
-  right: 12px;
-  width: 56px;
+  right: 10px;
+  width: 76px;
   text-align: right;
-  font-size: 14px;
+  font-size: 13px;
+  white-space: nowrap;
   color: var(--text-4);
   transform: translateY(-8px);
   pointer-events: none;
