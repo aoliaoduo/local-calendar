@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, writeFileSync } from 'node:fs'
 import { DateTime } from 'luxon'
 import { getRpcInfoPath, type RpcInfo } from '../shared/paths'
 import { openDatabase } from '../shared/db'
@@ -16,6 +16,7 @@ const HELP = `本地日历 CLI — 操作 Local Calendar 的日程与待办
   agenda                              今日总览（日程 + 待办）
   today                               agenda 的快捷别名
   next                                查看下一条即将开始的日程
+  export [-f 开始] [-t 结束] [-o 文件] 导出 ICS 日程文件
   list [-f 开始] [-t 结束] [-c 日历]   查询日程（默认今天起 7 天）
   create <标题> -s <开始> [-e <结束>]  创建日程
        [-c 日历] [--all-day] [-l 地点] [-n 说明]
@@ -109,9 +110,10 @@ const SHORT_TO_LONG: Record<string, string> = {
   d: 'due',
   f: 'from',
   t: 'to',
-  r: 'repeat'
+  r: 'repeat',
+  o: 'out'
 }
-const VALUE_FLAGS = new Set(['start', 'end', 'calendar', 'location', 'note', 'due', 'from', 'to', 'title', 'repeat', 'remind'])
+const VALUE_FLAGS = new Set(['start', 'end', 'calendar', 'location', 'note', 'due', 'from', 'to', 'title', 'repeat', 'remind', 'out'])
 const BOOL_FLAGS = new Set(['all-day', 'all', 'done', 'json'])
 
 const REPEAT_MAP: Record<string, string> = {
@@ -137,6 +139,41 @@ function parseReminders(value: string | undefined): { minutes: number; method: '
     throw new CliError('提醒分钟数必须是 0–10080 的整数（可用逗号分隔多个值）')
   }
   return [...new Set(values)].map((minutes) => ({ minutes, method: 'popup' as const }))
+}
+
+function icsEscape(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n')
+}
+
+function icsDate(value: string): string {
+  return DateTime.fromISO(value).toUTC().toFormat("yyyyMMdd'T'HHmmss'Z'")
+}
+
+async function cmdExport(backend: Backend, flags: Record<string, string | true>, json: boolean): Promise<void> {
+  const from = str(flags, 'from') ?? DateTime.now().minus({ days: 30 }).toFormat('yyyy-MM-dd')
+  const to = str(flags, 'to') ?? DateTime.now().plus({ days: 365 }).toFormat('yyyy-MM-dd')
+  const output = str(flags, 'out')
+  if (!output) throw new CliError('缺少输出文件。用法: export -o calendar.ics')
+  const events = await backend.call<CalendarEvent[]>('events.list', { from, to })
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Local Calendar//EN', 'CALSCALE:GREGORIAN']
+  for (const event of events) {
+    lines.push('BEGIN:VEVENT', `UID:${event.id}@local-calendar`, `DTSTAMP:${icsDate(event.createdAt)}`)
+    if (event.isAllDay) {
+      lines.push(`DTSTART;VALUE=DATE:${DateTime.fromISO(event.startUtc).toLocal().toFormat('yyyyMMdd')}`)
+      lines.push(`DTEND;VALUE=DATE:${DateTime.fromISO(event.endUtc).toLocal().plus({ days: 1 }).toFormat('yyyyMMdd')}`)
+    } else {
+      lines.push(`DTSTART:${icsDate(event.startUtc)}`, `DTEND:${icsDate(event.endUtc)}`)
+    }
+    lines.push(`SUMMARY:${icsEscape(event.title)}`)
+    if (event.description) lines.push(`DESCRIPTION:${icsEscape(event.description)}`)
+    if (event.location) lines.push(`LOCATION:${icsEscape(event.location)}`)
+    if (event.rrule) lines.push(`RRULE:${event.rrule}`)
+    lines.push('END:VEVENT')
+  }
+  lines.push('END:VCALENDAR')
+  writeFileSync(output, `${lines.join('\r\n')}\r\n`, 'utf8')
+  if (json) return emitJson({ path: output, count: events.length, from, to })
+  console.log(`已导出 ${events.length} 条日程 → ${output}`)
 }
 
 interface ParsedArgs {
@@ -473,6 +510,8 @@ async function main(): Promise<void> {
       return cmdAgenda(backend, json)
     case 'next':
       return cmdNext(backend, json)
+    case 'export':
+      return cmdExport(backend, flags, json)
     case 'list':
       return cmdList(backend, flags, json)
     case 'create':

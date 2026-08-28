@@ -29,6 +29,7 @@ localcal create "朋友生日" -s 2026-08-30 --all-day -c family
 localcal update abc12345 -e 2026-08-29T18:00     # id 可只写前几位
 localcal delete abc12345
 localcal search 评审
+localcal export -f 2026-08-28 -t 2027-08-28 -o calendar.ics
 localcal task add "交周报" -d 2026-09-04
 localcal task update 1a2b3c4d --title "交周报（已确认）" -n "周五 18:00 前"
 localcal task list                               # 未完成待办（--all 全部 / --done 已完成）
