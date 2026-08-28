@@ -17,6 +17,8 @@ Windows 便携版：`npm run dist:win`。如果网络需要本机代理，可用
 
 `npm run cal -- <命令>`；或 `npm link` 后直接使用 `localcal <命令>`。
 
+首次使用 CLI 请在项目目录执行一次 `npm link`，之后可在任意 PowerShell 窗口直接运行 `localcal`。CLI 会按自身安装路径定位本地 `data` 目录，不依赖当前 PowerShell 工作目录；应用运行时自动通过本地 RPC 操作当前便携版数据。
+
 应用运行时 CLI 走本地 RPC，改动实时同步到界面；应用未运行时直接读写本地数据库（下次启动后可见）。
 
 ```bash

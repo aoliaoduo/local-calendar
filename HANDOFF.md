@@ -16,6 +16,7 @@ Repository: https://github.com/aoliaoduo/local-calendar
 - Top-level settings menu follows the Google Calendar pattern: settings, recycle bin, appearance, and print.
 - Avatar opens a local profile card; appearance and calendar editing are separate from general settings.
 - PowerShell CLI is exposed through the package `bin/localcal.cmd` shim.
+- CLI also resolves its package directory from `process.argv[1]`, so the generated PowerShell shim works from any current directory.
 
 ## Next Recommended Work
 

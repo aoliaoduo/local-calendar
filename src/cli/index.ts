@@ -1,10 +1,16 @@
 import { readFileSync, existsSync, writeFileSync } from 'node:fs'
+import { dirname } from 'node:path'
 import { DateTime } from 'luxon'
 import { getRpcInfoPath, type RpcInfo } from '../shared/paths'
 import { openDatabase } from '../shared/db'
 import { CalendarService } from '../shared/service'
 import { createMethodTable, type MethodTable } from '../shared/rpc-methods'
 import type { Calendar, CalendarEvent, Task } from '../shared/types'
+
+if (!process.env.LOCAL_CALENDAR_PACKAGE_DIR && process.argv[1]) {
+  process.env.LOCAL_CALENDAR_PACKAGE_DIR = dirname(dirname(dirname(process.argv[1])))
+  process.env.LOCAL_CALENDAR_CLI_LOCAL = '1'
+}
 
 class CliError extends Error {}
 
