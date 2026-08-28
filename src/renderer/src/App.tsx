@@ -12,6 +12,8 @@ import SettingsDialog from './components/SettingsDialog'
 import DayAgendaDialog from './components/DayAgendaDialog'
 import HelpDialog from './components/HelpDialog'
 import RecycleBinDialog from './components/RecycleBinDialog'
+import AppearanceDialog from './components/AppearanceDialog'
+import ProfileDialog from './components/ProfileDialog'
 import { api, type CalendarInfo, type EventInfo, type TaskInfo } from './api'
 import { weekDates } from './dateUtils'
 
@@ -29,6 +31,8 @@ export default function App() {
   const [agendaDay, setAgendaDay] = useState<DateTime | null>(null)
   const [helpOpen, setHelpOpen] = useState(false)
   const [recycleOpen, setRecycleOpen] = useState(false)
+  const [appearanceOpen, setAppearanceOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const [username, setUsername] = useState(() => localStorage.getItem('local-calendar.username') || '本地用户')
   const [avatarColor, setAvatarColor] = useState(() => localStorage.getItem('local-calendar.avatar-color') || '#4285f4')
   const [avatarImage, setAvatarImage] = useState<string | null>(() => localStorage.getItem('local-calendar.avatar-image'))
@@ -269,6 +273,8 @@ export default function App() {
         onHelp={() => setHelpOpen(true)}
         onPrint={() => { void window.calendarApi.printCalendar().then((printed) => { if (!printed) setToast('打印已取消或失败') }) }}
         onRecycle={() => setRecycleOpen(true)}
+        onAppearance={() => setAppearanceOpen(true)}
+        onAvatarClick={() => setProfileOpen(true)}
         username={username}
         avatarColor={avatarColor}
         avatarImage={avatarImage}
@@ -363,6 +369,8 @@ export default function App() {
 
       {helpOpen && <HelpDialog calendars={calendars} onClose={() => setHelpOpen(false)} />}
       {recycleOpen && <RecycleBinDialog onClose={() => setRecycleOpen(false)} onToast={setToast} />}
+      {appearanceOpen && <AppearanceDialog theme={theme} onThemeChange={setTheme} onClose={() => setAppearanceOpen(false)} />}
+      {profileOpen && <ProfileDialog username={username} avatarColor={avatarColor} avatarImage={avatarImage} onEdit={() => setSettingsOpen(true)} onClose={() => setProfileOpen(false)} />}
 
       {agendaDay && (
         <DayAgendaDialog

@@ -24,6 +24,8 @@ interface TopBarProps {
   onHelp: () => void
   onPrint: () => void
   onRecycle: () => void
+  onAppearance: () => void
+  onAvatarClick: () => void
   username: string
   avatarColor: string
   avatarImage: string | null
@@ -49,6 +51,8 @@ export default function TopBar({
   onHelp,
   onPrint,
   onRecycle,
+  onAppearance,
+  onAvatarClick,
   username,
   avatarColor,
   avatarImage
@@ -197,7 +201,7 @@ export default function TopBar({
                 <button onClick={() => { setSettingsMenuOpen(false); onSettings() }}>设置</button>
                 <button onClick={() => { setSettingsMenuOpen(false); onRecycle() }}>回收站</button>
                 <div className="settings-menu-divider" />
-                <button onClick={() => { setSettingsMenuOpen(false); onSettings() }}>外观</button>
+                <button onClick={() => { setSettingsMenuOpen(false); onAppearance() }}>外观</button>
                 <button onClick={() => { setSettingsMenuOpen(false); onPrint() }}>打印</button>
               </div>
             </>
@@ -239,7 +243,7 @@ export default function TopBar({
         <button className="icon-btn" title="应用信息" onClick={() => onToast('本地日历 · 数据仅保存在此电脑。')}>
           <span className="material-icons">apps</span>
         </button>
-        <button className={`avatar${avatarImage ? ' has-image' : ''}`} title="本地账户" style={{ background: avatarImage ? `url(${avatarImage}) center/cover` : avatarColor }} onClick={onSettings}>{avatarImage ? '' : username.trim().slice(0, 1).toUpperCase() || 'A'}</button>
+        <button className={`avatar${avatarImage ? ' has-image' : ''}`} title="本地账户" style={{ background: avatarImage ? `url(${avatarImage}) center/cover` : avatarColor }} onClick={onAvatarClick}>{avatarImage ? '' : username.trim().slice(0, 1).toUpperCase() || 'A'}</button>
         <div className="window-controls">
           <button className="window-control" title="最小化" onClick={() => window.calendarApi.windowMinimize()}>
             <span className="material-icons">remove</span>

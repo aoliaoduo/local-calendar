@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { DateTime } from 'luxon'
 import { api, type TaskInfo } from '../api'
 
@@ -21,6 +21,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const [editTitle, setEditTitle] = useState('')
   const [editDue, setEditDue] = useState('')
   const [editNotes, setEditNotes] = useState('')
+  const moreRef = useRef<HTMLDivElement>(null)
   const [editReminder, setEditReminder] = useState('')
 
   const load = async () => {
@@ -32,6 +33,15 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
     const off = window.calendarApi.onDataChanged(() => void load())
     return off
   }, [])
+
+  useEffect(() => {
+    if (!moreOpen) return
+    const close = (event: PointerEvent) => {
+      if (!moreRef.current?.contains(event.target as Node)) setMoreOpen(false)
+    }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [moreOpen])
 
   const handleAdd = async () => {
     const title = newTitle.trim()
@@ -139,7 +149,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
 
   return (
     <aside className="tasks-panel">
-      <div className="tasks-head">
+      <div className="tasks-head" ref={moreRef}>
         <button className="icon-btn" title="关闭" onClick={onClose}>
           <span className="material-icons">close</span>
         </button>
