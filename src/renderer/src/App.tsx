@@ -36,10 +36,10 @@ export default function App() {
   }, [])
 
   const loadEvents = useCallback(async () => {
-    const from = cursor.startOf('month').minus({ days: 7 }).toFormat('yyyy-MM-dd')
-    const to = cursor.endOf('month').plus({ days: 7 }).toFormat('yyyy-MM-dd')
+    const from = (view === 'year' ? cursor.startOf('year') : cursor.startOf('month').minus({ months: 2 })).toFormat('yyyy-MM-dd')
+    const to = (view === 'year' ? cursor.endOf('year') : cursor.endOf('month').plus({ months: 2 })).toFormat('yyyy-MM-dd')
     setEvents(await api.listEvents(from, to))
-  }, [cursor])
+  }, [cursor, view])
 
   const loadTasks = useCallback(async () => {
     setTasks(await api.listTasks('all'))
