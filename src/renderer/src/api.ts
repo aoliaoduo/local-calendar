@@ -73,7 +73,11 @@ export const api = {
   searchEvents: (query: string) => rpc<EventInfo[]>('events.search', { query }),
   createEvent: (input: Record<string, unknown>) => rpc<EventInfo>('events.create', input),
   updateEvent: (id: string, patch: Record<string, unknown>) => rpc<EventInfo | null>('events.update', { id, patch }),
+  updateEventOccurrence: (id: string, occurrenceIndex: number, patch: Record<string, unknown>) =>
+    rpc<EventInfo>('events.updateOccurrence', { id, occurrenceIndex, patch }),
   deleteEvent: (id: string) => rpc<boolean>('events.delete', { id }),
+  deleteEventOccurrence: (id: string, occurrenceIndex: number) =>
+    rpc<boolean>('events.deleteOccurrence', { id, occurrenceIndex }),
   listTasks: (status: 'needsAction' | 'completed' | 'all' = 'needsAction') =>
     rpc<TaskInfo[]>('tasks.list', { filter: { status } }),
   createTask: (input: { title: string; notes?: string; dueAt?: string }) => rpc<TaskInfo>('tasks.create', input),

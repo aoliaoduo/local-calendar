@@ -17,7 +17,7 @@ export const EVENT_PALETTE = [
 
 export type DialogState =
   | { mode: 'create'; day: DateTime; hour?: number; allDay?: boolean; start?: DateTime; end?: DateTime }
-  | { mode: 'edit'; event: EventInfo }
+  | { mode: 'edit'; event: EventInfo; occurrenceIndex?: number }
   | null
 
 interface EventDialogProps {
@@ -95,6 +95,7 @@ export default function EventDialog({ state, calendars, onClose, onSaved }: Even
   const [description, setDescription] = useState(existing?.description ?? '')
   const [location, setLocation] = useState(existing?.location ?? '')
   const [repeat, setRepeat] = useState(repeatValue(existing?.rrule))
+  const [editScope, setEditScope] = useState<'occurrence' | 'series'>(state?.mode === 'edit' && state.occurrenceIndex !== undefined ? 'occurrence' : 'series')
   const [reminders, setReminders] = useState<ReminderInfo[]>(() => normalizeReminders(existing?.reminders))
   const [reminderMinutes, setReminderMinutes] = useState(String(10))
   const [error, setError] = useState('')
@@ -117,33 +118,24 @@ export default function EventDialog({ state, calendars, onClose, onSaved }: Even
         setError('结束时间需晚于开始时间')
         return
       }
+      const patch = {
+        title: title.trim() || '（无标题）',
+        start: startUtc,
+        end: endUtc,
+        isAllDay: allDay,
+        calendarId,
+        colorOverride: color,
+        description: description || null,
+        location: location || null,
+        rrule: repeat || null,
+        reminders
+      }
       if (editing) {
-        await api.updateEvent(existing!.id, {
-          title: title.trim() || '（无标题）',
-          start: startUtc,
-          end: endUtc,
-          isAllDay: allDay,
-          calendarId,
-          colorOverride: color,
-          description: description || null,
-          location: location || null,
-          rrule: repeat || null,
-          reminders
-        })
+        if (state.occurrenceIndex !== undefined && editScope === 'occurrence') await api.updateEventOccurrence(existing!.id, state.occurrenceIndex, patch)
+        else await api.updateEvent(existing!.id, patch)
         onSaved('已保存修改')
       } else {
-        await api.createEvent({
-          title: title.trim() || '（无标题）',
-          start: startUtc,
-          end: endUtc,
-          isAllDay: allDay,
-          calendarId,
-          colorOverride: color,
-          description: description || null,
-          location: location || null,
-          rrule: repeat || null,
-          reminders
-        })
+        await api.createEvent(patch)
         onSaved('已创建日程')
       }
       onClose()
@@ -154,7 +146,8 @@ export default function EventDialog({ state, calendars, onClose, onSaved }: Even
 
   const handleDelete = async () => {
     if (!editing) return
-    await api.deleteEvent(existing!.id)
+    if (state.occurrenceIndex !== undefined && editScope === 'occurrence') await api.deleteEventOccurrence(existing!.id, state.occurrenceIndex)
+    else await api.deleteEvent(existing!.id)
     onSaved('已删除日程')
     onClose()
   }
@@ -210,6 +203,19 @@ export default function EventDialog({ state, calendars, onClose, onSaved }: Even
             </label>
           </div>
         </div>
+
+        {editing && state.occurrenceIndex !== undefined && (
+          <div className="dlg-row occurrence-row">
+            <span className="material-icons">event_repeat</span>
+            <div className="fill occurrence-controls">
+              <span>应用范围</span>
+              <select value={editScope} onChange={(event) => setEditScope(event.target.value as 'occurrence' | 'series')}>
+                <option value="occurrence">仅此日程</option>
+                <option value="series">整个系列</option>
+              </select>
+            </div>
+          </div>
+        )}
 
         <div className="dlg-row">
           <span className="material-icons">event_repeat</span>

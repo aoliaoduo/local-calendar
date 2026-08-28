@@ -121,6 +121,10 @@ function expandRecurring(evt: CalendarEvent, from: DateTime, to: DateTime): Cale
     if (rule.count !== null && idx >= rule.count) break
     if (rule.until && occ > rule.until) break
     if (occ > to) break
+    if (evt.exdates.includes(occ.toUTC().toISO()!)) {
+      idx++
+      continue
+    }
     if (occ.plus({ milliseconds: durMs }) > from) {
       out.push({
         ...evt,
@@ -135,6 +139,24 @@ function expandRecurring(evt: CalendarEvent, from: DateTime, to: DateTime): Cale
   return out
 }
 
+function recurringOccurrence(evt: CalendarEvent, occurrenceIndex: number): { start: DateTime; end: DateTime } | null {
+  if (!evt.rrule || !Number.isInteger(occurrenceIndex) || occurrenceIndex < 0) return null
+  const rule = parseRule(evt.rrule)
+  if (!rule) return null
+  const origStart = DateTime.fromISO(evt.startUtc).toLocal()
+  const duration = DateTime.fromISO(evt.endUtc).toMillis() - DateTime.fromISO(evt.startUtc).toMillis()
+  let index = 0
+  for (const occurrence of ruleOccurrences(rule, origStart)) {
+    if (rule.count !== null && index >= rule.count) break
+    if (rule.until && occurrence > rule.until) break
+    if (index === occurrenceIndex) {
+      return { start: occurrence, end: occurrence.plus({ milliseconds: duration }) }
+    }
+    index++
+  }
+  return null
+}
+
 function normalizeReminders(value: Reminder[] | undefined): Reminder[] {
   const reminders = new Map<number, Reminder>()
   for (const reminder of value ?? []) {
@@ -143,6 +165,16 @@ function normalizeReminders(value: Reminder[] | undefined): Reminder[] {
     }
   }
   return [...reminders.values()].sort((first, second) => second.minutes - first.minutes)
+}
+
+function parseExdates(value: unknown): string[] {
+  if (typeof value !== 'string') return []
+  try {
+    const parsed = JSON.parse(value) as unknown
+    return Array.isArray(parsed) ? [...new Set(parsed.filter((item): item is string => typeof item === 'string'))] : []
+  } catch {
+    return []
+  }
 }
 
 function rowToCalendar(r: Record<string, unknown>): Calendar {
@@ -182,6 +214,7 @@ function rowToEvent(r: Record<string, unknown>): CalendarEvent {
     isAllDay: !!r.is_all_day,
     colorOverride: (r.color_override as string | null) ?? null,
     rrule: (r.rrule as string | null) ?? null,
+    exdates: parseExdates(r.exdates),
     status: r.status as CalendarEvent['status'],
     reminders,
     createdAt: r.created_at as string,
@@ -292,8 +325,8 @@ export class CalendarService {
     const now = nowIso()
     this.db
       .prepare(
-        `INSERT INTO events (id, calendar_id, title, description, location, start_utc, end_utc, is_all_day, color_override, rrule, status, reminders, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`
+        `INSERT INTO events (id, calendar_id, title, description, location, start_utc, end_utc, is_all_day, color_override, rrule, exdates, status, reminders, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`
       )
       .run(
         id,
@@ -306,6 +339,7 @@ export class CalendarService {
         isAllDay ? 1 : 0,
         input.colorOverride ?? null,
         rrule,
+        '[]',
         JSON.stringify(reminders),
         now,
         now
@@ -387,6 +421,7 @@ export class CalendarService {
         isAllDay: true,
         colorOverride: null,
         rrule: null,
+        exdates: [],
         status: 'confirmed' as const,
         reminders: [],
         createdAt: dayStart.toISO()!,
@@ -429,7 +464,8 @@ export class CalendarService {
     if (calendarId === HOLIDAY_CALENDAR_ID) throw new Error('中国节假日为内置只读日历，不能写入')
     const colorOverride = patch.colorOverride !== undefined ? patch.colorOverride : (cur.color_override as string | null)
     const status = patch.status ?? (cur.status as string)
-    const reminders = patch.reminders !== undefined ? normalizeReminders(patch.reminders) : rowToEvent(cur).reminders
+    const currentEvent = rowToEvent(cur)
+    const reminders = patch.reminders !== undefined ? normalizeReminders(patch.reminders) : currentEvent.reminders
     let rrule: string | null
     if (patch.rrule !== undefined) {
       rrule = patch.rrule?.trim() || null
@@ -439,10 +475,40 @@ export class CalendarService {
     }
     this.db
       .prepare(
-        `UPDATE events SET title = ?, description = ?, location = ?, start_utc = ?, end_utc = ?, is_all_day = ?, calendar_id = ?, color_override = ?, status = ?, reminders = ?, rrule = ?, updated_at = ? WHERE id = ?`
+        `UPDATE events SET title = ?, description = ?, location = ?, start_utc = ?, end_utc = ?, is_all_day = ?, calendar_id = ?, color_override = ?, status = ?, reminders = ?, rrule = ?, exdates = ?, updated_at = ? WHERE id = ?`
       )
-      .run(title, description, location, startUtc, endUtc, isAllDay ? 1 : 0, calendarId, colorOverride, status, JSON.stringify(reminders), rrule, nowIso(), id)
+      .run(title, description, location, startUtc, endUtc, isAllDay ? 1 : 0, calendarId, colorOverride, status, JSON.stringify(reminders), rrule, JSON.stringify(currentEvent.exdates), nowIso(), id)
     return this.getEvent(id)
+  }
+
+  deleteEventOccurrence(id: string, occurrenceIndex: number): boolean {
+    const event = this.getEvent(id)
+    if (!event) throw new Error(`日程不存在: ${id}`)
+    const occurrence = recurringOccurrence(event, occurrenceIndex)
+    if (!occurrence) throw new Error('重复日程实例不存在')
+    const exdates = [...new Set([...event.exdates, occurrence.start.toUTC().toISO()!])]
+    this.db.prepare('UPDATE events SET exdates = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(exdates), nowIso(), id)
+    return true
+  }
+
+  updateEventOccurrence(id: string, occurrenceIndex: number, patch: UpdateEventInput): CalendarEvent {
+    const event = this.getEvent(id)
+    if (!event) throw new Error(`日程不存在: ${id}`)
+    const occurrence = recurringOccurrence(event, occurrenceIndex)
+    if (!occurrence) throw new Error('重复日程实例不存在')
+    this.deleteEventOccurrence(id, occurrenceIndex)
+    return this.createEvent({
+      title: patch.title ?? event.title,
+      description: patch.description !== undefined ? patch.description ?? undefined : event.description ?? undefined,
+      location: patch.location !== undefined ? patch.location ?? undefined : event.location ?? undefined,
+      start: patch.start ?? occurrence.start.toUTC().toISO()!,
+      end: patch.end ?? occurrence.end.toUTC().toISO()!,
+      isAllDay: patch.isAllDay ?? event.isAllDay,
+      calendarId: patch.calendarId ?? event.calendarId,
+      colorOverride: patch.colorOverride !== undefined ? patch.colorOverride ?? undefined : event.colorOverride ?? undefined,
+      reminders: patch.reminders ?? event.reminders,
+      rrule: null
+    })
   }
 
   deleteEvent(id: string): boolean {

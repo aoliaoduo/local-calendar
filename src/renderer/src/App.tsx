@@ -114,8 +114,13 @@ export default function App() {
       setToast('节假日为内置只读日历')
       return
     }
-    const baseId = evt.id.includes('#') ? evt.id.split('#')[0] : evt.id
-    setDialog({ mode: 'edit', event: baseId === evt.id ? evt : { ...evt, id: baseId } })
+    const occurrenceMatch = evt.id.match(/#(\d+)$/)
+    const baseId = occurrenceMatch ? evt.id.slice(0, -occurrenceMatch[0].length) : evt.id
+    setDialog({
+      mode: 'edit',
+      event: baseId === evt.id ? evt : { ...evt, id: baseId },
+      ...(occurrenceMatch ? { occurrenceIndex: Number(occurrenceMatch[1]) } : {})
+    })
   }
 
   const handleEventMove = async (id: string, start: DateTime, end: DateTime) => {

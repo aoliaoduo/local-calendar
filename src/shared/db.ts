@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS events (
   is_all_day INTEGER NOT NULL DEFAULT 0,
   color_override TEXT,
   rrule TEXT,
+  exdates TEXT NOT NULL DEFAULT '[]',
   status TEXT NOT NULL DEFAULT 'confirmed',
   reminders TEXT NOT NULL DEFAULT '[]',
   created_at TEXT NOT NULL,
@@ -60,6 +61,9 @@ function migrateSchema(db: DB): void {
   const eventColumns = db.prepare('PRAGMA table_info(events)').all() as { name: string }[]
   if (!eventColumns.some((column) => column.name === 'reminders')) {
     db.exec("ALTER TABLE events ADD COLUMN reminders TEXT NOT NULL DEFAULT '[]'")
+  }
+  if (!eventColumns.some((column) => column.name === 'exdates')) {
+    db.exec("ALTER TABLE events ADD COLUMN exdates TEXT NOT NULL DEFAULT '[]'")
   }
 }
 

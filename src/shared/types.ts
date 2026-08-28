@@ -33,6 +33,7 @@ export interface CalendarEvent {
   isAllDay: boolean
   colorOverride: string | null
   rrule: string | null
+  exdates: string[]
   status: EventStatus
   reminders: Reminder[]
   createdAt: string
