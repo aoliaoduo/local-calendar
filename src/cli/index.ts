@@ -31,8 +31,8 @@ const HELP = `本地日历 CLI — 操作 Local Calendar 的日程与待办
 
 待办:
   task list [--all | --done]          列出待办（默认未完成）
-  task add <标题> [-d 截止日期] [-n 备注]
-  task update <id> [--title 标题] [-d 截止日期] [-n 备注]
+  task add <标题> [-d 截止日期] [-n 备注] [--remind 分钟]
+  task update <id> [--title 标题] [-d 截止日期] [-n 备注] [--remind 分钟|none]
   task done <id>                      标记完成
   task undo <id>                      重新打开
   task delete <id>                    删除待办
@@ -141,6 +141,14 @@ function parseReminders(value: string | undefined): { minutes: number; method: '
     throw new CliError('提醒分钟数必须是 0–10080 的整数（可用逗号分隔多个值）')
   }
   return [...new Set(values)].map((minutes) => ({ minutes, method: 'popup' as const }))
+}
+
+function parseTaskReminder(value: string | undefined): number | null | undefined {
+  if (value === undefined) return undefined
+  if (value.trim().toLowerCase() === 'none' || value.trim() === '') return null
+  const minutes = Number(value)
+  if (!Number.isInteger(minutes) || minutes < 0 || minutes > 10080) throw new CliError('任务提醒分钟数必须是 0–10080 的整数')
+  return minutes
 }
 
 function icsEscape(value: string): string {
@@ -505,7 +513,8 @@ async function cmdTaskAdd(
   const task = await backend.call<Task>('tasks.create', {
     title,
     notes: str(flags, 'note'),
-    dueAt: str(flags, 'due')
+    dueAt: str(flags, 'due'),
+    reminderMinutes: parseTaskReminder(str(flags, 'remind'))
   })
   if (json) return emitJson(task)
   console.log(`已创建待办 → ${fmtTaskLine(task)}`)
@@ -534,7 +543,8 @@ async function cmdTaskUpdate(
   if (str(flags, 'title')) patch.title = str(flags, 'title')
   if (flags.due !== undefined) patch.dueAt = str(flags, 'due') ?? null
   if (flags.note !== undefined) patch.notes = str(flags, 'note') ?? null
-  if (!Object.keys(patch).length) throw new CliError('没有要修改的字段（--title / -d / -n）')
+  if (flags.remind !== undefined) patch.reminderMinutes = parseTaskReminder(str(flags, 'remind'))
+  if (!Object.keys(patch).length) throw new CliError('没有要修改的字段（--title / -d / -n / --remind）')
   const task = await backend.call<Task>('tasks.update', { id: target.id, patch })
   if (json) return emitJson(task)
   console.log(`已更新待办 → ${fmtTaskLine(task)}`)
