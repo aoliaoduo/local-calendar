@@ -268,6 +268,7 @@ export default function App() {
         onSettings={() => setSettingsOpen(true)}
         onHelp={() => setHelpOpen(true)}
         onPrint={() => { void window.calendarApi.printCalendar().then((printed) => { if (!printed) setToast('打印已取消或失败') }) }}
+        onRecycle={() => setRecycleOpen(true)}
         username={username}
         avatarColor={avatarColor}
         avatarImage={avatarImage}
