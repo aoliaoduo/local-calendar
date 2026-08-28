@@ -596,6 +596,22 @@
   cursor: default;
 }
 
+.occurrence-row {
+  align-items: center;
+}
+
+.occurrence-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-2);
+}
+
+.occurrence-controls select {
+  width: auto;
+  min-width: 128px;
+}
+
 .color-row {
   display: flex;
   gap: 8px;
