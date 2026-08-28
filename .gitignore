@@ -3,6 +3,7 @@ dist/
 out/
 release/
 portable-*/
+data/
 *.db
 *.db-wal
 *.db-shm
