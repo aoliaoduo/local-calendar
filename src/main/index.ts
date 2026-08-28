@@ -374,6 +374,7 @@ app.whenReady().then(() => {
     if (!win) return
     if (win.isMaximized()) win.unmaximize()
     else win.maximize()
+    win.webContents.send('window-state-changed', win.isMaximized())
   })
   ipcMain.handle('window-is-maximized', (event) => BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false)
   ipcMain.on('window-close', (event) => BrowserWindow.fromWebContents(event.sender)?.close())
@@ -415,6 +416,20 @@ app.whenReady().then(() => {
     const count = importIcsFile(result.filePaths[0])
     for (const win of BrowserWindow.getAllWindows()) win.webContents.send('data-changed', { method: 'events.import' })
     return count
+  })
+  ipcMain.handle('choose-avatar', async () => {
+    const result = await dialog.showOpenDialog({
+      title: '选择头像',
+      properties: ['openFile'],
+      filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
+    })
+    const filePath = result.filePaths[0]
+    if (result.canceled || !filePath) return null
+    const stat = statSync(filePath)
+    if (stat.size > 2 * 1024 * 1024) throw new Error('头像图片不能超过 2 MB')
+    const ext = filePath.toLowerCase().split('.').pop()
+    const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : 'image/png'
+    return `data:${mime};base64,${readFileSync(filePath).toString('base64')}`
   })
 
   startRpcServer(() => BrowserWindow.getAllWindows())

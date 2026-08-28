@@ -24,6 +24,7 @@ interface TopBarProps {
   onHelp: () => void
   username: string
   avatarColor: string
+  avatarImage: string | null
 }
 
 const VIEW_LABEL: Record<ViewKind, string> = { day: '日', '4day': '4 天', week: '周', month: '月', year: '年', agenda: '日程' }
@@ -45,7 +46,8 @@ export default function TopBar({
   onSettings,
   onHelp,
   username,
-  avatarColor
+  avatarColor,
+  avatarImage
 }: TopBarProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -63,6 +65,7 @@ export default function TopBar({
 
   useEffect(() => {
     void window.calendarApi.windowIsMaximized().then(setMaximized)
+    return window.calendarApi.onWindowStateChanged(setMaximized)
   }, [])
 
   useEffect(() => {
@@ -230,12 +233,12 @@ export default function TopBar({
         <button className="icon-btn" title="应用信息" onClick={() => onToast('本地日历 · 数据仅保存在此电脑。')}>
           <span className="material-icons">apps</span>
         </button>
-        <button className="avatar" title="本地账户" style={{ background: avatarColor }} onClick={onSettings}>{username.trim().slice(0, 1).toUpperCase() || 'A'}</button>
+        <button className={`avatar${avatarImage ? ' has-image' : ''}`} title="本地账户" style={{ background: avatarImage ? `url(${avatarImage}) center/cover` : avatarColor }} onClick={onSettings}>{avatarImage ? '' : username.trim().slice(0, 1).toUpperCase() || 'A'}</button>
         <div className="window-controls">
           <button className="window-control" title="最小化" onClick={() => window.calendarApi.windowMinimize()}>
             <span className="material-icons">remove</span>
           </button>
-          <button className="window-control" title={maximized ? '还原' : '最大化'} onClick={() => { window.calendarApi.windowToggleMaximize(); setMaximized((value) => !value) }}>
+          <button className="window-control" title={maximized ? '还原' : '最大化'} onClick={() => window.calendarApi.windowToggleMaximize()}>
             <span className="material-icons">{maximized ? 'filter_none' : 'crop_square'}</span>
           </button>
           <button className="window-control close" title="关闭" onClick={() => window.calendarApi.windowClose()}>

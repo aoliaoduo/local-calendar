@@ -18,6 +18,8 @@ interface SettingsDialogProps {
   username: string
   avatarColor: string
   onProfileChange: (username: string, avatarColor: string) => void
+  avatarImage: string | null
+  onAvatarImageChange: (image: string | null) => void
   onClose: () => void
 }
 
@@ -37,6 +39,8 @@ export default function SettingsDialog({
   username,
   avatarColor,
   onProfileChange,
+  avatarImage,
+  onAvatarImageChange,
   onClose
 }: SettingsDialogProps) {
   const [newName, setNewName] = useState('')
@@ -111,6 +115,15 @@ export default function SettingsDialog({
     }
   }
 
+  const chooseAvatar = async () => {
+    try {
+      const image = await window.calendarApi.chooseAvatar()
+      if (image) onAvatarImageChange(image)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '选择头像失败')
+    }
+  }
+
   const deleteCalendar = async (id: string) => {
     try {
       await onCalendarDelete(id)
@@ -154,9 +167,11 @@ export default function SettingsDialog({
         <section className="settings-section">
           <div className="settings-section-title">本地账户</div>
           <div className="profile-editor">
-            <div className="profile-avatar" style={{ background: avatarColor }}>{username.trim().slice(0, 1).toUpperCase() || 'A'}</div>
+            <div className={`profile-avatar${avatarImage ? ' has-image' : ''}`} style={{ background: avatarImage ? `url(${avatarImage}) center/cover` : avatarColor }}>{avatarImage ? '' : username.trim().slice(0, 1).toUpperCase() || 'A'}</div>
             <input value={username} maxLength={24} placeholder="用户名" onChange={(event) => onProfileChange(event.target.value, avatarColor)} />
             <input className="settings-color" type="color" value={avatarColor} title="头像颜色" onChange={(event) => onProfileChange(username, event.target.value)} />
+            <button className="btn-text compact" onClick={() => void chooseAvatar()}>选择头像</button>
+            {avatarImage && <button className="btn-text compact" onClick={() => onAvatarImageChange(null)}>移除</button>}
           </div>
           <div className="settings-hint">仅用于本机显示，不连接任何在线账户。</div>
         </section>

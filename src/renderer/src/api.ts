@@ -11,11 +11,13 @@ interface CalendarApi {
   windowMinimize: () => void
   windowToggleMaximize: () => void
   windowIsMaximized: () => Promise<boolean>
+  onWindowStateChanged: (callback: (maximized: boolean) => void) => () => void
   windowClose: () => void
   openDataDir: () => Promise<string>
   backupData: () => Promise<string | null>
   restoreData: () => Promise<string | null>
   importIcs: () => Promise<number>
+  chooseAvatar: () => Promise<string | null>
 }
 
 declare global {

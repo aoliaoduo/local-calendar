@@ -179,6 +179,11 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
               value={newDue}
               onChange={(e) => setNewDue(e.target.value)}
             />
+            <div className="task-date-chips">
+              <button type="button" onClick={() => setNewDue(today)}>今天</button>
+              <button type="button" onClick={() => setNewDue(DateTime.now().plus({ days: 1 }).toISODate()!)}>明天</button>
+              <button type="button" onClick={() => setNewDue('')}>清除日期</button>
+            </div>
             <select className="task-add-reminder" value={newReminder} onChange={(event) => setNewReminder(event.target.value)}>
               <option value="">不提醒</option>
               <option value="0">截止时提醒</option>

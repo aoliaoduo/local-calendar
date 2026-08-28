@@ -1218,6 +1218,23 @@
   color: var(--text-1);
 }
 
+.task-date-chips {
+  display: flex;
+  gap: 6px;
+}
+
+.task-date-chips button {
+  padding: 4px 10px;
+  border: 1px solid var(--divider);
+  border-radius: 14px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.task-date-chips button:hover {
+  background: var(--hover);
+}
+
 .task-reminder {
   display: flex;
   align-items: center;
