@@ -301,6 +301,20 @@
   z-index: 1;
 }
 
+.wk-select-preview-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 8px;
+  color: var(--g-blue-text);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.wk-select-preview-label span {
+  font-size: 11px;
+}
+
 .wk-now {
   position: absolute;
   height: 2px;

@@ -312,6 +312,9 @@ export default function WeekView({
   const hasAllday = dates.some((d) => (evtsByDay.get(d.toISODate()!)?.allday.length ?? 0) > 0)
   const nowTop = (now.hour * 60 + now.minute) / 60 * HOUR_PX
   const todayIdx = dates.findIndex((d) => d.hasSame(today, 'day'))
+  const selectionLabel = selection
+    ? `${dates[selection.fromIdx].startOf('day').plus({ minutes: selection.fromMin }).toFormat('HH:mm')} – ${dates[selection.toIdx].startOf('day').plus({ minutes: selection.toMin }).toFormat('HH:mm')}`
+    : ''
 
   return (
     <div className={`wk${drag ? ' dragging' : ''}`} style={{ '--cols': cols } as React.CSSProperties}>
@@ -488,7 +491,9 @@ export default function WeekView({
                         top: `${(dayIdx === selection.fromIdx ? selection.fromMin : 0) / 60 * HOUR_PX}px`,
                         height: `${((dayIdx === selection.toIdx ? selection.toMin : 24 * 60) - (dayIdx === selection.fromIdx ? selection.fromMin : 0)) / 60 * HOUR_PX}px`
                       }}
-                    />
+                    >
+                      {dayIdx === selection.fromIdx && <div className="wk-select-preview-label"><strong>（无标题）</strong><span>{selectionLabel}</span></div>}
+                    </div>
                   )}
                   {drag && drag.kind !== 'allday' && drag.dayIdx === dayIdx && (
                     <div

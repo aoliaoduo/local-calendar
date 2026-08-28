@@ -23,6 +23,7 @@ interface TopBarProps {
   onSettings: () => void
   onHelp: () => void
   onPrint: () => void
+  onRecycle: () => void
   username: string
   avatarColor: string
   avatarImage: string | null
@@ -47,11 +48,13 @@ export default function TopBar({
   onSettings,
   onHelp,
   onPrint,
+  onRecycle,
   username,
   avatarColor,
   avatarImage
 }: TopBarProps) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<EventInfo[]>([])
@@ -183,12 +186,23 @@ export default function TopBar({
         <button className="icon-btn" title="使用说明" onClick={onHelp}>
           <span className="material-icons">help_outline</span>
         </button>
-        <button className="icon-btn" title="打印" onClick={onPrint}>
-          <span className="material-icons">print</span>
-        </button>
-        <button className="icon-btn" title="设置" onClick={onSettings}>
-          <span className="material-icons">settings</span>
-        </button>
+        <div className="settings-menu-wrap">
+          <button className={`icon-btn${settingsMenuOpen ? ' active' : ''}`} title="设置" onClick={() => setSettingsMenuOpen((value) => !value)}>
+            <span className="material-icons">settings</span>
+          </button>
+          {settingsMenuOpen && (
+            <>
+              <div className="menu-mask" onClick={() => setSettingsMenuOpen(false)} />
+              <div className="settings-menu">
+                <button onClick={() => { setSettingsMenuOpen(false); onSettings() }}>设置</button>
+                <button onClick={() => { setSettingsMenuOpen(false); onRecycle() }}>回收站</button>
+                <div className="settings-menu-divider" />
+                <button onClick={() => { setSettingsMenuOpen(false); onSettings() }}>外观</button>
+                <button onClick={() => { setSettingsMenuOpen(false); onPrint() }}>打印</button>
+              </div>
+            </>
+          )}
+        </div>
 
         <div className="view-menu-wrap">
           <button className="view-select" onClick={() => setMenuOpen((v) => !v)}>
