@@ -7,7 +7,7 @@ import { openDatabase } from '../shared/db'
 import { CalendarService } from '../shared/service'
 import { createMethodTable } from '../shared/rpc-methods'
 import { getRpcInfoPath, getDataDir } from '../shared/paths'
-import { writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { existsSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
 
 function configurePortableStorage(): void {
   if (!app.isPackaged) return
@@ -17,6 +17,15 @@ function configurePortableStorage(): void {
   app.setPath('userData', dataDir)
   app.setPath('sessionData', join(dataDir, 'session'))
   app.setPath('logs', join(dataDir, 'logs'))
+}
+
+function getIconPath(): string {
+  const candidates = [
+    join(__dirname, '../renderer/icon.ico'),
+    join(app.getAppPath(), 'src/renderer/icon.ico'),
+    join(process.cwd(), 'src/renderer/icon.ico')
+  ]
+  return candidates.find((candidate) => existsSync(candidate)) || candidates[0]
 }
 
 configurePortableStorage()
@@ -125,7 +134,7 @@ function createWindow(): void {
     autoHideMenuBar: true,
     frame: false,
     title: '本地日历',
-    icon: join(__dirname, '../renderer/icon.ico'),
+    icon: getIconPath(),
     show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
@@ -149,7 +158,11 @@ function createWindow(): void {
 
 function createTray(): void {
   if (tray) return
-  tray = new Tray(join(__dirname, '../renderer/icon.ico'))
+  try {
+    tray = new Tray(getIconPath())
+  } catch {
+    return
+  }
   tray.setToolTip('本地日历')
   tray.setContextMenu(
     Menu.buildFromTemplate([

@@ -33,6 +33,7 @@
     },
     "files": [
       "out/**/*",
+      "src/renderer/icon.ico",
       "package.json"
     ],
     "artifactName": "${productName}-${version}-portable.${ext}",
