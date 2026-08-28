@@ -25,6 +25,7 @@ interface EventDialogProps {
   calendars: CalendarInfo[]
   onClose: () => void
   onSaved: (message: string) => void
+  onCreateTask?: (input: { title: string; notes: string; dueAt: string; reminderMinutes: number }) => Promise<void>
 }
 
 const REPEAT_OPTIONS = [
@@ -72,7 +73,7 @@ function toLocalInput(utcIso: string, allDay: boolean): string {
   return allDay ? dt.toFormat('yyyy-MM-dd') : dt.toFormat("yyyy-MM-dd'T'HH:mm")
 }
 
-export default function EventDialog({ state, calendars, onClose, onSaved }: EventDialogProps) {
+export default function EventDialog({ state, calendars, onClose, onSaved, onCreateTask }: EventDialogProps) {
   const editing = state?.mode === 'edit'
   const existing = editing ? state.event : null
 
@@ -99,6 +100,7 @@ export default function EventDialog({ state, calendars, onClose, onSaved }: Even
   const [reminders, setReminders] = useState<ReminderInfo[]>(() => existing ? normalizeReminders(existing.reminders) : [{ minutes: 0, method: 'popup' }])
   const [reminderMinutes, setReminderMinutes] = useState(String(0))
   const [error, setError] = useState('')
+  const [createTask, setCreateTask] = useState(false)
 
   if (!state) return null
   const detailed = state.mode === 'create' && state.detailed === true
@@ -111,6 +113,15 @@ export default function EventDialog({ state, calendars, onClose, onSaved }: Even
 
   const handleSave = async () => {
     try {
+      if (!editing && createTask) {
+        if (!title.trim()) return
+        const dueAt = allDay ? start : start.slice(0, 10)
+        if (!onCreateTask) throw new Error('任务创建入口不可用')
+        await onCreateTask({ title: title.trim(), notes: description.trim(), dueAt, reminderMinutes: 900 })
+        onSaved('已创建任务')
+        onClose()
+        return
+      }
       const startUtc = buildTime(start, initStart)
       const endUtc = allDay
         ? buildTime(start, initStart).replace('T00:00:00.000Z', 'T23:59:59.999Z')
@@ -187,6 +198,7 @@ export default function EventDialog({ state, calendars, onClose, onSaved }: Even
             if (e.key === 'Enter') void handleSave()
           }}
         />
+        {!editing && onCreateTask && <label className="create-kind"><input type="checkbox" checked={createTask} onChange={(event) => setCreateTask(event.target.checked)} /><span>创建为任务</span></label>}
 
         <div className="dlg-row">
           <span className="material-icons">schedule</span>

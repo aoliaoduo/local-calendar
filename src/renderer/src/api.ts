@@ -27,6 +27,8 @@ interface CalendarApi {
   chooseAvatar: () => Promise<string | null>
   getNotificationSettings: () => Promise<{ notificationsEnabled: boolean }>
   setNotificationSettings: (enabled: boolean) => Promise<{ notificationsEnabled: boolean }>
+  getProfile: () => Promise<{ username: string; avatarColor: string; avatarImage: string | null }>
+  setProfile: (profile: { username?: string; avatarColor?: string; avatarImage?: string | null }) => Promise<{ username: string; avatarColor: string; avatarImage: string | null }>
 }
 
 declare global {
@@ -78,6 +80,8 @@ export interface TaskInfo {
   sortOrder: number
   rrule: string | null
   exdates: string[]
+  createdAt: string
+  updatedAt: string
   status: 'needsAction' | 'completed'
 }
 

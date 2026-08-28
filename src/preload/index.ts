@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('calendarApi', {
   windowClose: () => ipcRenderer.send('window-close'),
   getNotificationSettings: () => ipcRenderer.invoke('notification-settings:get') as Promise<{ notificationsEnabled: boolean }>,
   setNotificationSettings: (enabled: boolean) => ipcRenderer.invoke('notification-settings:set', enabled) as Promise<{ notificationsEnabled: boolean }>,
+  getProfile: () => ipcRenderer.invoke('profile:get') as Promise<{ username: string; avatarColor: string; avatarImage: string | null }>,
+  setProfile: (profile: { username?: string; avatarColor?: string; avatarImage?: string | null }) => ipcRenderer.invoke('profile:set', profile) as Promise<{ username: string; avatarColor: string; avatarImage: string | null }>,
   openDataDir: () => ipcRenderer.invoke('open-data-dir') as Promise<string>,
   backupData: () => ipcRenderer.invoke('backup-data') as Promise<string | null>,
   restoreData: () => ipcRenderer.invoke('restore-data') as Promise<string | null>,

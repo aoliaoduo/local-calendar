@@ -7,8 +7,10 @@ export function startOfWeek(dt: DateTime): DateTime {
   return dt.startOf('week', { useLocaleWeeks: false }).minus({ days: 1 }).startOf('day')
 }
 
-export function weekDates(anchor: DateTime): DateTime[] {
-  const start = anchor.startOf('day').minus({ days: anchor.weekday % 7 })
+export function weekDates(anchor: DateTime, weekStart: 0 | 1 = 0): DateTime[] {
+  const dayIndex = anchor.weekday % 7
+  const offset = (dayIndex - weekStart + 7) % 7
+  const start = anchor.startOf('day').minus({ days: offset })
   return Array.from({ length: 7 }, (_, i) => start.plus({ days: i }))
 }
 

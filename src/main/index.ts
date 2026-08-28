@@ -14,13 +14,12 @@ import { existsSync, copyFileSync, readFileSync, writeFileSync, mkdirSync, rmSyn
 const windowStatePath = () => join(getDataDir(), 'window-state.json')
 const preferencesPath = () => join(getDataDir(), 'preferences.json')
 interface NotificationPreferences { notificationsEnabled: boolean }
+interface UserPreferences extends NotificationPreferences { username?: string; avatarColor?: string; avatarImage?: string | null }
+function readPreferences(): UserPreferences {
+  try { return JSON.parse(readFileSync(preferencesPath(), 'utf8')) as UserPreferences } catch { return { notificationsEnabled: true } }
+}
 function readNotificationPreferences(): NotificationPreferences {
-  try {
-    const value = JSON.parse(readFileSync(preferencesPath(), 'utf8')) as Partial<NotificationPreferences>
-    return { notificationsEnabled: value.notificationsEnabled !== false }
-  } catch {
-    return { notificationsEnabled: true }
-  }
+  return { notificationsEnabled: readPreferences().notificationsEnabled !== false }
 }
 interface WindowState { x?: number; y?: number; width?: number; height?: number; maximized?: boolean }
 function readWindowState(): WindowState {
@@ -236,12 +235,17 @@ function buildTrayMenu(): Menu {
   const today = DateTime.now().toISODate()!
   let eventItems: Electron.MenuItemConstructorOptions[] = []
   let taskItems: Electron.MenuItemConstructorOptions[] = []
+  let overdueItems: Electron.MenuItemConstructorOptions[] = []
   try {
     eventItems = svc.listEvents(today, today).slice(0, 8).map((event) => ({
       label: `${event.isAllDay ? '全天' : DateTime.fromISO(event.startUtc).toLocal().toFormat('HH:mm')}  ${event.title}`,
       click: () => focusTarget('event', event.id)
     }))
     taskItems = svc.listTaskOccurrences(today, today).filter((task) => task.status === 'needsAction').slice(0, 8).map((task) => ({
+      label: task.dueAt ? `${task.title}（${DateTime.fromISO(task.dueAt).toLocal().toFormat('M月d日')}）` : task.title,
+      click: () => focusTarget('task', task.id)
+    }))
+    overdueItems = svc.listTasks({ status: 'needsAction', dueBefore: today }).slice(0, 8).map((task) => ({
       label: task.dueAt ? `${task.title}（${DateTime.fromISO(task.dueAt).toLocal().toFormat('M月d日')}）` : task.title,
       click: () => focusTarget('task', task.id)
     }))
@@ -254,6 +258,7 @@ function buildTrayMenu(): Menu {
     { type: 'separator' },
     { label: `今日安排（${eventItems.length}）`, submenu: eventItems.length ? eventItems : [{ label: '今天没有日程', enabled: false }] },
     { label: `未完成任务（${taskItems.length}）`, submenu: taskItems.length ? taskItems : [{ label: '没有未完成任务', enabled: false }] },
+    { label: `已逾期任务（${overdueItems.length}）`, submenu: overdueItems.length ? overdueItems : [{ label: '没有逾期任务', enabled: false }] },
     { type: 'separator' },
     { label: '退出', click: () => { isQuitting = true; app.quit() } }
   ])
@@ -423,9 +428,18 @@ app.whenReady().then(() => {
   ipcMain.handle('window-is-maximized', (event) => BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false)
   ipcMain.handle('notification-settings:get', () => readNotificationPreferences())
   ipcMain.handle('notification-settings:set', (_event, enabled: boolean) => {
-    const preferences = { notificationsEnabled: enabled !== false }
+    const preferences = { ...readPreferences(), notificationsEnabled: enabled !== false }
     writeFileSync(preferencesPath(), JSON.stringify(preferences, null, 2))
     return preferences
+  })
+  ipcMain.handle('profile:get', () => {
+    const preferences = readPreferences()
+    return { username: preferences.username || '本地用户', avatarColor: preferences.avatarColor || '#4285f4', avatarImage: preferences.avatarImage || null }
+  })
+  ipcMain.handle('profile:set', (_event, profile: { username?: string; avatarColor?: string; avatarImage?: string | null }) => {
+    const preferences = { ...readPreferences(), username: profile.username?.trim() || '本地用户', avatarColor: profile.avatarColor || '#4285f4', avatarImage: profile.avatarImage || null }
+    writeFileSync(preferencesPath(), JSON.stringify(preferences, null, 2))
+    return { username: preferences.username, avatarColor: preferences.avatarColor, avatarImage: preferences.avatarImage }
   })
   ipcMain.handle('print-calendar', async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)

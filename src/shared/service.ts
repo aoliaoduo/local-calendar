@@ -304,7 +304,12 @@ export class CalendarService {
   updateCalendar(id: string, patch: { name?: string; color?: string; isVisible?: boolean }): Calendar | null {
     const cur = this.db.prepare('SELECT * FROM calendars WHERE id = ?').get(id) as Record<string, unknown> | undefined
     if (!cur) throw new Error(`日历不存在: ${id}`)
-    if (id === HOLIDAY_CALENDAR_ID) throw new Error('中国节假日为内置只读日历，不能修改')
+    if (id === HOLIDAY_CALENDAR_ID) {
+      if (patch.name !== undefined || patch.color !== undefined) throw new Error('中国节假日为内置只读日历，不能修改名称或颜色')
+      const isVisible = patch.isVisible ?? !!cur.is_visible
+      this.db.prepare('UPDATE calendars SET is_visible = ?, updated_at = ? WHERE id = ?').run(isVisible ? 1 : 0, nowIso(), id)
+      return this.getCalendar(id)
+    }
     const name = patch.name !== undefined ? patch.name.trim() : (cur.name as string)
     if (!name) throw new Error('日历名称不能为空')
     const color = patch.color ?? (cur.color as string)

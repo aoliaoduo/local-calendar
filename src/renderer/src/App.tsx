@@ -21,6 +21,7 @@ import { weekDates } from './dateUtils'
 
 export default function App() {
   const [view, setView] = useState<ViewKind>(() => (localStorage.getItem('local-calendar.default-view') as ViewKind) || 'week')
+  const [weekStart, setWeekStart] = useState<0 | 1>(() => localStorage.getItem('local-calendar.week-start') === '1' ? 1 : 0)
   const [cursor, setCursor] = useState(() => DateTime.now())
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [tasksOpen, setTasksOpen] = useState(true)
@@ -82,6 +83,11 @@ export default function App() {
 
   useEffect(() => {
     void window.calendarApi.getNotificationSettings().then((settings) => setNotificationsEnabled(settings.notificationsEnabled)).catch(() => {})
+    void window.calendarApi.getProfile().then((profile) => {
+      setUsername(profile.username)
+      setAvatarColor(profile.avatarColor)
+      setAvatarImage(profile.avatarImage)
+    }).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -174,19 +180,21 @@ export default function App() {
     setAvatarColor(nextAvatarColor)
     localStorage.setItem('local-calendar.username', nextUsername.trim() || '本地用户')
     localStorage.setItem('local-calendar.avatar-color', nextAvatarColor)
+    void window.calendarApi.setProfile({ username: nextUsername, avatarColor: nextAvatarColor, avatarImage })
   }
 
   const updateAvatarImage = (image: string | null) => {
     setAvatarImage(image)
     if (image) localStorage.setItem('local-calendar.avatar-image', image)
     else localStorage.removeItem('local-calendar.avatar-image')
+    void window.calendarApi.setProfile({ username, avatarColor, avatarImage: image })
   }
 
   const dates = useMemo(() => {
     if (view === 'day') return [cursor.startOf('day')]
     if (view === '4day') return Array.from({ length: 4 }, (_, index) => cursor.startOf('day').plus({ days: index }))
-    return weekDates(cursor)
-  }, [view, cursor.toISODate()])
+    return weekDates(cursor, weekStart)
+  }, [view, cursor.toISODate(), weekStart])
 
   const displayCalendars = useMemo(() => [
     ...calendars,
@@ -433,6 +441,7 @@ export default function App() {
           calendars={calendars}
           onClose={() => setDialog(null)}
           onSaved={(msg) => setToast(msg)}
+          onCreateTask={async (input) => { await api.createTask(input); await loadBootstrap() }}
         />
       )}
 
@@ -440,6 +449,8 @@ export default function App() {
         <SettingsDialog
           view={view}
           onViewChange={setPreferredView}
+          weekStart={weekStart}
+          onWeekStartChange={(value) => { setWeekStart(value); localStorage.setItem('local-calendar.week-start', String(value)) }}
           onOpenDataDir={handleOpenDataDir}
           onBackup={handleBackup}
           onRestore={handleRestore}
@@ -454,7 +465,7 @@ export default function App() {
       {helpOpen && <HelpDialog calendars={calendars} onClose={() => setHelpOpen(false)} />}
       {recycleOpen && <RecycleBinDialog onClose={() => setRecycleOpen(false)} onToast={setToast} />}
       {appearanceOpen && <AppearanceDialog theme={theme} onThemeChange={setTheme} onClose={() => setAppearanceOpen(false)} />}
-      {profileOpen && <ProfileDialog username={username} avatarColor={avatarColor} avatarImage={avatarImage} onEdit={() => setSettingsOpen(true)} onClose={() => setProfileOpen(false)} />}
+      {profileOpen && <ProfileDialog username={username} avatarColor={avatarColor} avatarImage={avatarImage} onSave={(name, color, image) => { updateProfile(name, color); updateAvatarImage(image); setProfileOpen(false) }} onClose={() => setProfileOpen(false)} />}
       {calendarToEdit && <CalendarEditDialog calendar={calendarToEdit} onSave={(patch) => handleCalendarUpdate(calendarToEdit.id, patch)} onClose={() => setCalendarToEdit(null)} />}
       {taskToEdit && <TaskDialog task={taskToEdit} occurrenceIndex={taskOccurrenceIndex} occurrenceDue={taskOccurrenceDue} onClose={() => { setTaskToEdit(null); setTaskOccurrenceIndex(undefined); setTaskOccurrenceDue(undefined) }} onSaved={(message) => { setTaskToEdit(null); setTaskOccurrenceIndex(undefined); setTaskOccurrenceDue(undefined); setToast(message); void loadTasks(); void loadTaskOccurrences() }} />}
 

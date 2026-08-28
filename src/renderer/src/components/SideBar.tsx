@@ -105,7 +105,7 @@ export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, o
         </div>
       </div>
       {addingCalendar && (
-        <div className="sidebar-calendar-create">
+        <div className="sidebar-calendar-create" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) { setAddingCalendar(false); setNewCalendarName('') } }}>
           <input autoFocus placeholder="日历名称" value={newCalendarName} onChange={(event) => setNewCalendarName(event.target.value)} />
           <input className="settings-color" type="color" value={newCalendarColor} onChange={(event) => setNewCalendarColor(event.target.value)} />
           <button className="btn-text compact" disabled={!newCalendarName.trim()} onClick={() => void onCreateCalendar(newCalendarName, newCalendarColor).then(() => { setNewCalendarName(''); setAddingCalendar(false) }).catch((error) => setCalendarError(error instanceof Error ? error.message : '创建失败'))}>添加</button>

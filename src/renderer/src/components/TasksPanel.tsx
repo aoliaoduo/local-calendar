@@ -28,6 +28,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const [editPriority, setEditPriority] = useState('0')
   const [dragId, setDragId] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'today' | 'overdue' | 'scheduled'>('all')
+  const [sortMode, setSortMode] = useState<'manual' | 'due' | 'priority' | 'created'>('manual')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [editRrule, setEditRrule] = useState('')
 
@@ -99,6 +100,16 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
     if (filter === 'today') return date === todayStr
     if (filter === 'overdue') return date! < todayStr!
     return true
+  })
+  const sortedOpen = [...filteredOpen].sort((first, second) => {
+    if (sortMode === 'priority') return (second.priority ?? 0) - (first.priority ?? 0)
+    if (sortMode === 'created') return second.createdAt.localeCompare(first.createdAt)
+    if (sortMode === 'due') {
+      if (!first.dueAt) return 1
+      if (!second.dueAt) return -1
+      return first.dueAt.localeCompare(second.dueAt)
+    }
+    return (first.sortOrder ?? 0) - (second.sortOrder ?? 0)
   })
   const groupTasks = (items: TaskInfo[]) => {
     const today = DateTime.now().startOf('day')
@@ -176,8 +187,8 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
     const dueDate = t.dueAt ? DateTime.fromISO(t.dueAt).toLocal() : null
     const overdue = dueDate && dueDate.toISODate()! < todayStr
     return (
-      <div key={t.id} className={`task-item${dragId === t.id ? ' dragging' : ''}`} draggable={t.status === 'needsAction'} onDragStart={() => setDragId(t.id)} onDragEnd={() => setDragId(null)} onDragOver={(event) => { if (t.status === 'needsAction') event.preventDefault() }} onDrop={(event) => { event.preventDefault(); void handleDrop(t.id) }}>
-        {t.status === 'needsAction' && <span className="material-icons task-drag-handle" title="拖动排序">drag_handle</span>}
+      <div key={t.id} className={`task-item${dragId === t.id ? ' dragging' : ''}`} draggable={t.status === 'needsAction' && sortMode === 'manual'} onDragStart={() => setDragId(t.id)} onDragEnd={() => setDragId(null)} onDragOver={(event) => { if (t.status === 'needsAction' && sortMode === 'manual') event.preventDefault() }} onDrop={(event) => { event.preventDefault(); void handleDrop(t.id) }}>
+        {t.status === 'needsAction' && sortMode === 'manual' && <span className="material-icons task-drag-handle" title="拖动排序">drag_handle</span>}
         <input className="task-select" type="checkbox" aria-label={`选择${t.title}`} checked={selected.has(t.id)} onChange={() => toggleSelected(t.id)} onClick={(event) => event.stopPropagation()} />
         <button
           className={`task-check${t.status === 'completed' ? ' done' : ''}`}
@@ -264,9 +275,10 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
         <div className="task-filters" role="tablist" aria-label="任务筛选">
           {([['all', '全部'], ['today', '今天'], ['overdue', '逾期'], ['scheduled', '有日期']] as const).map(([key, label]) => <button key={key} className={filter === key ? 'active' : ''} onClick={() => setFilter(key)}>{label}</button>)}
         </div>
+        <label className="task-sort"><span>排序</span><select value={sortMode} onChange={(event) => setSortMode(event.target.value as typeof sortMode)}><option value="manual">手动顺序</option><option value="due">截止日期</option><option value="priority">优先级</option><option value="created">最近创建</option></select></label>
         {selected.size > 0 && <div className="task-bulk-bar"><span>已选 {selected.size}</span><button className="btn-text compact" onClick={() => void batchComplete()}>完成</button><button className="btn-text compact danger" onClick={() => void batchDelete()}>删除</button><button className="icon-btn compact" title="清除选择" onClick={() => setSelected(new Set())}><span className="material-icons">close</span></button></div>}
         {adding ? (
-          <div className="task-add-form">
+          <div className="task-add-form" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) { setAdding(false); setNewTitle(''); setNewDue(today); setNewReminder('900'); setNewRrule('') } }}>
             <span className="task-add-check" />
             <input
               autoFocus
@@ -326,7 +338,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
           </button>
         )}
 
-        {groupTasks(filteredOpen).map((group) => <section className="task-group" key={group.key}><div className="task-group-label">{group.label}</div>{group.items.map(renderTask)}</section>)}
+        {groupTasks(sortedOpen).map((group) => <section className="task-group" key={group.key}><div className="task-group-label">{group.label}</div>{group.items.map(renderTask)}</section>)}
 
         {visibleDone.length > 0 && (
           <>
