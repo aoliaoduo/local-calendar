@@ -209,8 +209,9 @@ select {
 }
 
 .logo-date {
-  width: 38px;
-  height: 38px;
+  position: relative;
+  width: 44px;
+  height: 44px;
   border-radius: 9px;
   background: linear-gradient(145deg, #77a8ff, #1a73e8 58%);
   display: flex;
@@ -218,6 +219,17 @@ select {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+.logo-date::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  top: 5px;
+  height: 5px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .logo-date .logo-dow {
@@ -228,14 +240,15 @@ select {
 }
 
 .logo-date .logo-num {
-  font-size: 17px;
+  font-size: 24px;
   color: #fff;
   font-weight: 500;
-  line-height: 1.05;
+  line-height: 1;
+  margin-top: 5px;
 }
 
 .logo-block .logo-text {
-  font-size: 24px;
+  font-size: 26px;
   color: var(--text-1);
   font-weight: 400;
 }
@@ -872,6 +885,41 @@ select {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.profile-editor {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-editor input:not(.settings-color) {
+  flex: 1;
+  height: 38px;
+  border: 1px solid var(--divider);
+  border-radius: 6px;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--text-1);
+}
+
+.profile-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.settings-hint {
+  margin-top: 8px;
+  color: var(--text-4);
+  font-size: 12px;
 }
 
 .settings-calendar-row {

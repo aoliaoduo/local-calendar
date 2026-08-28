@@ -15,6 +15,9 @@ interface SettingsDialogProps {
   onBackup: () => Promise<string | null>
   onRestore: () => Promise<string | null>
   onImportIcs: () => Promise<number>
+  username: string
+  avatarColor: string
+  onProfileChange: (username: string, avatarColor: string) => void
   onClose: () => void
 }
 
@@ -31,6 +34,9 @@ export default function SettingsDialog({
   onBackup,
   onRestore,
   onImportIcs,
+  username,
+  avatarColor,
+  onProfileChange,
   onClose
 }: SettingsDialogProps) {
   const [newName, setNewName] = useState('')
@@ -143,6 +149,16 @@ export default function SettingsDialog({
               <option value="dark">深色</option>
             </select>
           </label>
+        </section>
+
+        <section className="settings-section">
+          <div className="settings-section-title">本地账户</div>
+          <div className="profile-editor">
+            <div className="profile-avatar" style={{ background: avatarColor }}>{username.trim().slice(0, 1).toUpperCase() || 'A'}</div>
+            <input value={username} maxLength={24} placeholder="用户名" onChange={(event) => onProfileChange(event.target.value, avatarColor)} />
+            <input className="settings-color" type="color" value={avatarColor} title="头像颜色" onChange={(event) => onProfileChange(username, event.target.value)} />
+          </div>
+          <div className="settings-hint">仅用于本机显示，不连接任何在线账户。</div>
         </section>
 
         <section className="settings-section">

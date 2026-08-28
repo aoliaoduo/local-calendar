@@ -4,7 +4,7 @@ import { getLunarMonthLabel } from '@shared/lunar'
 import { api, type CalendarInfo, type EventInfo } from '../api'
 import { fmtEventTime } from '../dateUtils'
 
-export type ViewKind = 'day' | 'week' | 'month'
+export type ViewKind = 'day' | '4day' | 'week' | 'month' | 'year' | 'agenda'
 
 interface TopBarProps {
   view: ViewKind
@@ -21,9 +21,12 @@ interface TopBarProps {
   onSearchPick: (event: EventInfo) => void
   onToast: (message: string) => void
   onSettings: () => void
+  onHelp: () => void
+  username: string
+  avatarColor: string
 }
 
-const VIEW_LABEL: Record<ViewKind, string> = { day: '日', week: '周', month: '月' }
+const VIEW_LABEL: Record<ViewKind, string> = { day: '日', '4day': '4 天', week: '周', month: '月', year: '年', agenda: '日程' }
 
 export default function TopBar({
   view,
@@ -39,7 +42,10 @@ export default function TopBar({
   onToggleTasks,
   onSearchPick,
   onToast,
-  onSettings
+  onSettings,
+  onHelp,
+  username,
+  avatarColor
 }: TopBarProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -83,7 +89,6 @@ export default function TopBar({
       </button>
       <div className="logo-block">
         <div className="logo-date">
-          <span className="logo-dow">{['日', '一', '二', '三', '四', '五', '六'][today.weekday % 7]}</span>
           <span className="logo-num">{dayNum}</span>
         </div>
         <span className="logo-text">日历</span>
@@ -165,7 +170,7 @@ export default function TopBar({
         >
           <span className="material-icons">search</span>
         </button>
-        <button className="icon-btn" title="使用说明" onClick={() => onToast('使用左侧创建按钮添加日程，点击日程即可编辑。')}>
+        <button className="icon-btn" title="使用说明" onClick={onHelp}>
           <span className="material-icons">help_outline</span>
         </button>
         <button className="icon-btn" title="设置" onClick={onSettings}>
@@ -181,7 +186,7 @@ export default function TopBar({
             <>
               <div className="menu-mask" onClick={() => setMenuOpen(false)} />
               <div className="view-menu">
-                {(['day', 'week', 'month'] as const).map((v) => (
+                {(['day', '4day', 'week', 'month', 'year', 'agenda'] as const).map((v) => (
                   <button
                     key={v}
                     className={`view-menu-item${view === v ? ' current' : ''}`}
@@ -190,7 +195,7 @@ export default function TopBar({
                       setMenuOpen(false)
                     }}
                   >
-                    <span className="material-icons">{v === 'day' ? 'calendar_view_day' : v === 'week' ? 'calendar_view_week' : 'calendar_view_month'}</span>
+                    <span className="material-icons">{v === 'day' ? 'calendar_view_day' : v === '4day' ? 'view_week' : v === 'week' ? 'calendar_view_week' : v === 'month' ? 'calendar_view_month' : v === 'year' ? 'calendar_today' : 'view_agenda'}</span>
                     {VIEW_LABEL[v]}
                     {view === v && <span className="material-icons check">check</span>}
                   </button>
@@ -220,7 +225,7 @@ export default function TopBar({
         <button className="icon-btn" title="应用信息" onClick={() => onToast('本地日历 · 数据仅保存在此电脑。')}>
           <span className="material-icons">apps</span>
         </button>
-        <button className="avatar" title="本地账户" onClick={() => onToast('当前使用本地账户，未连接任何云服务。')}>A</button>
+        <button className="avatar" title="本地账户" style={{ background: avatarColor }} onClick={onSettings}>{username.trim().slice(0, 1).toUpperCase() || 'A'}</button>
         <div className="window-controls">
           <button className="window-control" title="最小化" onClick={() => window.calendarApi.windowMinimize()}>
             <span className="material-icons">remove</span>

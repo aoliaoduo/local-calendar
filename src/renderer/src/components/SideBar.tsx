@@ -9,12 +9,11 @@ interface SideBarProps {
   onAnchorChange: (dt: DateTime) => void
   onCreate: () => void
   onToggleCalendar: (id: string, visible: boolean) => void
-  onManageCalendars: () => void
   onCreateCalendar: (name: string, color: string) => Promise<void>
   collapsed: boolean
 }
 
-export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, onToggleCalendar, onManageCalendars, onCreateCalendar, collapsed }: SideBarProps) {
+export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, onToggleCalendar, onCreateCalendar, collapsed }: SideBarProps) {
   const [miniMonth, setMiniMonth] = useState(() => anchor.startOf('month'))
   const [showMyCals, setShowMyCals] = useState(true)
   const [showOtherCals, setShowOtherCals] = useState(true)
@@ -96,9 +95,6 @@ export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, o
         <div className="side-group-actions">
           <button className="icon-btn small" title="快速添加日历" onClick={() => { setAddingCalendar((value) => !value); setCalendarError('') }}>
             <span className="material-icons">add</span>
-          </button>
-          <button className="icon-btn small" title="管理日历" onClick={onManageCalendars}>
-            <span className="material-icons">settings</span>
           </button>
           <button className="icon-btn small" title="展开/折叠" onClick={() => setShowMyCals((v) => !v)}>
             <span className="material-icons">{showMyCals ? 'expand_less' : 'expand_more'}</span>

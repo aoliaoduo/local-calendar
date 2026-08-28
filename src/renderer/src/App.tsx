@@ -4,11 +4,14 @@ import TopBar, { type ViewKind } from './components/TopBar'
 import SideBar from './components/SideBar'
 import WeekView from './components/WeekView'
 import MonthView from './components/MonthView'
+import YearView from './components/YearView'
+import AgendaView from './components/AgendaView'
 import EventDialog, { type DialogState } from './components/EventDialog'
 import TasksPanel from './components/TasksPanel'
 import SettingsDialog from './components/SettingsDialog'
 import DayAgendaDialog from './components/DayAgendaDialog'
-import { api, type CalendarInfo, type EventInfo } from './api'
+import HelpDialog from './components/HelpDialog'
+import { api, type CalendarInfo, type EventInfo, type TaskInfo } from './api'
 import { weekDates } from './dateUtils'
 
 export default function App() {
@@ -18,10 +21,14 @@ export default function App() {
   const [tasksOpen, setTasksOpen] = useState(false)
   const [calendars, setCalendars] = useState<CalendarInfo[]>([])
   const [events, setEvents] = useState<EventInfo[]>([])
+  const [tasks, setTasks] = useState<TaskInfo[]>([])
   const [dialog, setDialog] = useState<DialogState>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [agendaDay, setAgendaDay] = useState<DateTime | null>(null)
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [username, setUsername] = useState(() => localStorage.getItem('local-calendar.username') || '本地用户')
+  const [avatarColor, setAvatarColor] = useState(() => localStorage.getItem('local-calendar.avatar-color') || '#4285f4')
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('local-calendar.theme') as 'light' | 'dark') || 'light')
 
   const loadCalendars = useCallback(async () => {
@@ -34,6 +41,10 @@ export default function App() {
     setEvents(await api.listEvents(from, to))
   }, [cursor])
 
+  const loadTasks = useCallback(async () => {
+    setTasks(await api.listTasks('all'))
+  }, [])
+
   useEffect(() => {
     void loadCalendars()
   }, [loadCalendars])
@@ -41,6 +52,10 @@ export default function App() {
   useEffect(() => {
     void loadEvents()
   }, [loadEvents])
+
+  useEffect(() => {
+    void loadTasks()
+  }, [loadTasks])
 
   useEffect(() => {
     const w = window as unknown as { __setView?: (v: ViewKind) => void; __openCreate?: () => void; __openTasks?: () => void }
@@ -53,9 +68,10 @@ export default function App() {
     const off = window.calendarApi.onDataChanged(() => {
       void loadCalendars()
       void loadEvents()
+      void loadTasks()
     })
     return off
-  }, [loadCalendars, loadEvents])
+  }, [loadCalendars, loadEvents, loadTasks])
 
   useEffect(() => window.calendarApi.onAppToast(setToast), [])
 
@@ -75,15 +91,48 @@ export default function App() {
     localStorage.setItem('local-calendar.default-view', nextView)
   }
 
+  const updateProfile = (nextUsername: string, nextAvatarColor: string) => {
+    setUsername(nextUsername.trim() || '本地用户')
+    setAvatarColor(nextAvatarColor)
+    localStorage.setItem('local-calendar.username', nextUsername.trim() || '本地用户')
+    localStorage.setItem('local-calendar.avatar-color', nextAvatarColor)
+  }
+
   const dates = useMemo(() => {
     if (view === 'day') return [cursor.startOf('day')]
+    if (view === '4day') return Array.from({ length: 4 }, (_, index) => cursor.startOf('day').plus({ days: index }))
     return weekDates(cursor)
   }, [view, cursor.toISODate()])
 
+  const displayCalendars = useMemo(() => [
+    ...calendars,
+    { id: 'tasks', name: '任务', color: '#5f6368', isPrimary: false, isVisible: true }
+  ], [calendars])
+
+  const calendarEvents = useMemo<EventInfo[]>(() => [
+    ...events,
+    ...tasks.filter((task) => task.dueAt).map((task) => {
+      const day = DateTime.fromISO(task.dueAt!).startOf('day')
+      return {
+        id: `task-${task.id}`,
+        calendarId: 'tasks',
+        title: task.title,
+        description: task.notes,
+        location: null,
+        startUtc: day.toUTC().toISO()!,
+        endUtc: day.endOf('day').toUTC().toISO()!,
+        isAllDay: true,
+        colorOverride: task.status === 'completed' ? '#9aa0a6' : '#5f6368',
+        rrule: null,
+        reminders: []
+      }
+    })
+  ], [events, tasks])
+
   const title = useMemo(() => {
-    if (view === 'month' || view === 'week') {
-      const weekStart = view === 'week' ? dates[0] : cursor.startOf('month')
-      const weekEnd = view === 'week' ? dates[6] : cursor.endOf('month')
+    if (view === 'month' || view === 'week' || view === '4day') {
+      const weekStart = view === 'month' ? cursor.startOf('month') : dates[0]
+      const weekEnd = view === 'month' ? cursor.endOf('month') : dates[dates.length - 1]
       if (weekStart.year === weekEnd.year && weekStart.month === weekEnd.month) {
         return weekStart.toFormat('yyyy年M月')
       }
@@ -92,12 +141,16 @@ export default function App() {
       }
       return `${weekStart.toFormat('yyyy年M月')} – ${weekEnd.toFormat('yyyy年M月')}`
     }
+    if (view === 'year') return cursor.toFormat('yyyy年')
+    if (view === 'agenda') return '日程'
     return cursor.toFormat('M月d日 EEEE')
   }, [view, dates, cursor.toISODate()])
 
   const step = (dir: 1 | -1) => {
     if (view === 'day') setCursor(cursor.plus({ days: dir }))
     else if (view === 'week') setCursor(cursor.plus({ weeks: dir }))
+    else if (view === '4day') setCursor(cursor.plus({ days: dir * 4 }))
+    else if (view === 'year') setCursor(cursor.plus({ years: dir }))
     else setCursor(cursor.plus({ months: dir }))
   }
 
@@ -112,6 +165,10 @@ export default function App() {
   }
 
   const openEvent = (evt: EventInfo) => {
+    if (evt.calendarId === 'tasks') {
+      setToast('任务请在右侧任务面板中编辑')
+      return
+    }
     if (evt.calendarId === 'holidays') {
       setToast('节假日为内置只读日历')
       return
@@ -126,6 +183,10 @@ export default function App() {
   }
 
   const handleEventMove = async (id: string, start: DateTime, end: DateTime) => {
+    if (id.startsWith('task-')) {
+      setToast('任务请在任务面板中修改截止日期')
+      return
+    }
     try {
       await api.updateEvent(id, { start: start.toISO()!, end: end.toISO()! })
       await loadEvents()
@@ -196,6 +257,9 @@ export default function App() {
         onToggleTasks={() => setTasksOpen((v) => !v)}
         onToast={setToast}
         onSettings={() => setSettingsOpen(true)}
+        onHelp={() => setHelpOpen(true)}
+        username={username}
+        avatarColor={avatarColor}
         onSearchPick={(evt) => {
           setCursor(DateTime.fromISO(evt.startUtc) as DateTime<true>)
           setView('day')
@@ -214,7 +278,6 @@ export default function App() {
             setDialog({ mode: 'create', day: DateTime.now(), hour: Math.min(23, DateTime.now().hour + 1) })
           }
           onToggleCalendar={handleToggleCalendar}
-          onManageCalendars={() => setSettingsOpen(true)}
           onCreateCalendar={handleCalendarCreate}
           collapsed={!sidebarOpen}
         />
@@ -223,18 +286,22 @@ export default function App() {
         {view === 'month' ? (
           <MonthView
             anchor={cursor}
-            events={events}
-            calendars={calendars}
+            events={calendarEvents}
+            calendars={displayCalendars}
             onEventClick={openEvent}
             onDayClick={(d) => setDialog({ mode: 'create', day: d, allDay: true })}
             onDayDetails={setAgendaDay}
             onEventMove={handleEventMove}
           />
+        ) : view === 'year' ? (
+          <YearView anchor={cursor} events={calendarEvents} calendars={displayCalendars} onMonthClick={(month) => { setCursor(month as DateTime<true>); setPreferredView('month') }} />
+        ) : view === 'agenda' ? (
+          <AgendaView anchor={cursor} events={calendarEvents} calendars={displayCalendars} onEventClick={openEvent} />
         ) : (
           <WeekView
             dates={dates}
-            events={events}
-            calendars={calendars}
+            events={calendarEvents}
+            calendars={displayCalendars}
             onEventClick={openEvent}
             onSlotClick={(day, hour) => setDialog({ mode: 'create', day, hour })}
             onDayNumClick={(d) => {
@@ -272,9 +339,14 @@ export default function App() {
           onBackup={handleBackup}
           onRestore={handleRestore}
           onImportIcs={handleImportIcs}
+          username={username}
+          avatarColor={avatarColor}
+          onProfileChange={updateProfile}
           onClose={() => setSettingsOpen(false)}
         />
       )}
+
+      {helpOpen && <HelpDialog calendars={calendars} onClose={() => setHelpOpen(false)} />}
 
       {agendaDay && (
         <DayAgendaDialog
