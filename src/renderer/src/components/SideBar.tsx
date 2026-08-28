@@ -9,10 +9,10 @@ interface SideBarProps {
   onAnchorChange: (dt: DateTime) => void
   onCreate: () => void
   onToggleCalendar: (id: string, visible: boolean) => void
-  onToast: (message: string) => void
+  onManageCalendars: () => void
 }
 
-export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, onToggleCalendar, onToast }: SideBarProps) {
+export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, onToggleCalendar, onManageCalendars }: SideBarProps) {
   const [miniMonth, setMiniMonth] = useState(() => anchor.startOf('month'))
   const [showMyCals, setShowMyCals] = useState(true)
   const [showOtherCals, setShowOtherCals] = useState(true)
@@ -81,23 +81,16 @@ export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, o
         </div>
       </div>
 
-      <button className="find-people" onClick={() => onToast('这是本地单机版，暂不支持邀请协作成员。')}>
-        <span className="material-icons">person_search</span>
-        找人
-      </button>
-
-      <div className="side-group-title-row">
-        <span className="side-group-title">预约页面</span>
-        <button className="icon-btn small" title="创建预约页面" onClick={() => onToast('预约页面功能正在规划中。')}>
-          <span className="material-icons">add</span>
-        </button>
-      </div>
-
       <div className="side-group-title-row">
         <span className="side-group-title">我的日历</span>
-        <button className="icon-btn small" title="展开/折叠" onClick={() => setShowMyCals((v) => !v)}>
-          <span className="material-icons">{showMyCals ? 'expand_less' : 'expand_more'}</span>
-        </button>
+        <div className="side-group-actions">
+          <button className="icon-btn small" title="添加日历" onClick={onManageCalendars}>
+            <span className="material-icons">add</span>
+          </button>
+          <button className="icon-btn small" title="展开/折叠" onClick={() => setShowMyCals((v) => !v)}>
+            <span className="material-icons">{showMyCals ? 'expand_less' : 'expand_more'}</span>
+          </button>
+        </div>
       </div>
       {showMyCals && myCals.map(renderCalRow)}
 

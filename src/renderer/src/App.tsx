@@ -193,7 +193,7 @@ export default function App() {
             setDialog({ mode: 'create', day: DateTime.now(), hour: Math.min(23, DateTime.now().hour + 1) })
           }
           onToggleCalendar={handleToggleCalendar}
-          onToast={setToast}
+          onManageCalendars={() => setSettingsOpen(true)}
         />
       )}
 

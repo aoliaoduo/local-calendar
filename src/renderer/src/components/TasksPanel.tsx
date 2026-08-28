@@ -11,7 +11,8 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const [tasks, setTasks] = useState<TaskInfo[]>([])
   const [adding, setAdding] = useState(false)
   const [newTitle, setNewTitle] = useState('')
-  const [newDue, setNewDue] = useState('')
+  const today = DateTime.now().toISODate()!
+  const [newDue, setNewDue] = useState(today)
   const [showDone, setShowDone] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
@@ -33,7 +34,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
     if (!title) return
     await api.createTask({ title, dueAt: newDue || undefined })
     setNewTitle('')
-    setNewDue('')
+    setNewDue(today)
     setAdding(false)
     onToast('已添加任务')
     void load()
@@ -145,6 +146,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
                 if (e.key === 'Escape') {
                   setAdding(false)
                   setNewTitle('')
+                  setNewDue(today)
                 }
               }}
             />
@@ -163,6 +165,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
                 onClick={() => {
                   setAdding(false)
                   setNewTitle('')
+                  setNewDue(today)
                 }}
               >
                 取消

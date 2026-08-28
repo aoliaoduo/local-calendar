@@ -675,6 +675,12 @@ select {
   height: 48px;
 }
 
+.side-group-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .side-group-title {
   font-size: 14px;
   font-weight: 500;
