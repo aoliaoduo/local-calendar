@@ -29,7 +29,7 @@
     "icon": "src/renderer/icon.ico",
     "asar": true,
     "directories": {
-      "output": "portable-v0.1.0"
+      "output": "portable-v0.1.1"
     },
     "files": [
       "out/**/*",
