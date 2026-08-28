@@ -1,0 +1,519 @@
+import { randomUUID } from 'node:crypto'
+import { DateTime } from 'luxon'
+import type { DB } from './db'
+import { getHolidays, HOLIDAY_CALENDAR_ID } from './lunar'
+import type {
+  Calendar,
+  CalendarEvent,
+  CreateCalendarInput,
+  CreateEventInput,
+  CreateTaskInput,
+  Reminder,
+  Task,
+  UpdateEventInput,
+  UpdateTaskInput
+} from './types'
+
+export const EVENT_COLORS = [
+  { key: 'tomato', hex: '#d50000' },
+  { key: 'flamingo', hex: '#e67c73' },
+  { key: 'tangerine', hex: '#f4511e' },
+  { key: 'banana', hex: '#f9ab00' },
+  { key: 'sage', hex: '#0b8043' },
+  { key: 'peacock', hex: '#039be5' },
+  { key: 'blueberry', hex: '#3f51b5' },
+  { key: 'lavender', hex: '#7986cb' },
+  { key: 'grape', hex: '#8e24aa' },
+  { key: 'graphite', hex: '#616161' }
+] as const
+
+function nowIso(): string {
+  return new Date().toISOString()
+}
+
+function parseWhen(value: string, endOfDay = false): DateTime | null {
+  if (!value) return null
+  let dt = DateTime.fromISO(value, { zone: 'local' })
+  if (!dt.isValid) dt = DateTime.fromSQL(value, { zone: 'local' })
+  if (!dt.isValid) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+    dt = endOfDay ? dt.endOf('day') : dt.startOf('day')
+  }
+  return dt
+}
+
+const DAY_CODES = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU']
+
+export interface ParsedRule {
+  freq: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY'
+  interval: number
+  byday: number[]
+  until: DateTime | null
+  count: number | null
+}
+
+export function parseRule(rrule: string): ParsedRule | null {
+  let freq: ParsedRule['freq'] | null = null
+  let interval = 1
+  let byday: number[] = []
+  let until: DateTime | null = null
+  let count: number | null = null
+  const applyFreq = (v: string): void => {
+    if (v === 'DAILY' || v === 'WEEKLY' || v === 'MONTHLY' || v === 'YEARLY') freq = v
+  }
+  for (const part of rrule.split(';')) {
+    const eq = part.indexOf('=')
+    if (eq === -1) {
+      applyFreq(part.trim().toUpperCase())
+      continue
+    }
+    const key = part.slice(0, eq).trim().toUpperCase()
+    const val = part.slice(eq + 1).trim()
+    if (key === 'FREQ') {
+      applyFreq(val.toUpperCase())
+    } else if (key === 'INTERVAL') {
+      const n = Number(val)
+      if (Number.isInteger(n) && n >= 1) interval = n
+    } else if (key === 'BYDAY') {
+      byday = val
+        .split(',')
+        .map((d) => DAY_CODES.indexOf(d.trim().toUpperCase()))
+        .filter((i) => i >= 0)
+        .sort((a, b) => a - b)
+    } else if (key === 'UNTIL') {
+      const u = DateTime.fromISO(val, { zone: 'local' })
+      if (u.isValid) until = u.endOf('day')
+    } else if (key === 'COUNT') {
+      const n = Number(val)
+      if (Number.isInteger(n) && n >= 1) count = n
+    }
+  }
+  return freq ? { freq, interval, byday, until, count } : null
+}
+
+function* ruleOccurrences(rule: ParsedRule, origStart: DateTime): Generator<DateTime> {
+  if (rule.freq === 'WEEKLY' && rule.byday.length) {
+    const week0 = origStart.startOf('week')
+    const timeOfDay = origStart.toMillis() - origStart.startOf('day').toMillis()
+    for (let w = 0; w < 600; w++) {
+      for (const d of rule.byday) {
+        const occ = week0.plus({ weeks: w * rule.interval, days: d, milliseconds: timeOfDay })
+        if (occ >= origStart) yield occ
+      }
+    }
+    return
+  }
+  const unit = rule.freq === 'DAILY' ? 'days' : rule.freq === 'WEEKLY' ? 'weeks' : rule.freq === 'MONTHLY' ? 'months' : 'years'
+  for (let n = 0; n <= 1500; n++) {
+    yield origStart.plus({ [unit]: n * rule.interval })
+  }
+}
+
+function expandRecurring(evt: CalendarEvent, from: DateTime, to: DateTime): CalendarEvent[] {
+  const rule = evt.rrule ? parseRule(evt.rrule) : null
+  if (!rule) return [evt]
+  const origStart = DateTime.fromISO(evt.startUtc).toLocal()
+  const durMs = DateTime.fromISO(evt.endUtc).toMillis() - origStart.toMillis()
+  const out: CalendarEvent[] = []
+  let idx = 0
+  for (const occ of ruleOccurrences(rule, origStart)) {
+    if (rule.count !== null && idx >= rule.count) break
+    if (rule.until && occ > rule.until) break
+    if (occ > to) break
+    if (occ.plus({ milliseconds: durMs }) > from) {
+      out.push({
+        ...evt,
+        id: `${evt.id}#${idx}`,
+        startUtc: occ.toUTC().toISO()!,
+        endUtc: occ.plus({ milliseconds: durMs }).toUTC().toISO()!
+      })
+    }
+    idx++
+    if (out.length >= 500) break
+  }
+  return out
+}
+
+function normalizeReminders(value: Reminder[] | undefined): Reminder[] {
+  const reminders = new Map<number, Reminder>()
+  for (const reminder of value ?? []) {
+    if (Number.isInteger(reminder.minutes) && reminder.minutes >= 0 && reminder.minutes <= 10080) {
+      reminders.set(reminder.minutes, { minutes: reminder.minutes, method: 'popup' })
+    }
+  }
+  return [...reminders.values()].sort((first, second) => second.minutes - first.minutes)
+}
+
+function rowToCalendar(r: Record<string, unknown>): Calendar {
+  return {
+    id: r.id as string,
+    name: r.name as string,
+    color: r.color as string,
+    isPrimary: !!r.is_primary,
+    isVisible: !!r.is_visible,
+    timeZone: r.time_zone as string,
+    createdAt: r.created_at as string,
+    updatedAt: r.updated_at as string
+  }
+}
+
+function rowToEvent(r: Record<string, unknown>): CalendarEvent {
+  let reminders: Reminder[] = []
+  try {
+    const parsed = JSON.parse((r.reminders as string) || '[]') as unknown
+    if (Array.isArray(parsed)) {
+      reminders = parsed
+        .filter((item): item is { minutes: number; method?: string } => !!item && typeof item === 'object')
+        .map((item) => ({ minutes: Number(item.minutes), method: 'popup' as const }))
+        .filter((item) => Number.isInteger(item.minutes) && item.minutes >= 0 && item.minutes <= 10080)
+    }
+  } catch {
+    reminders = []
+  }
+  return {
+    id: r.id as string,
+    calendarId: r.calendar_id as string,
+    title: r.title as string,
+    description: (r.description as string | null) ?? null,
+    location: (r.location as string | null) ?? null,
+    startUtc: r.start_utc as string,
+    endUtc: r.end_utc as string,
+    isAllDay: !!r.is_all_day,
+    colorOverride: (r.color_override as string | null) ?? null,
+    rrule: (r.rrule as string | null) ?? null,
+    status: r.status as CalendarEvent['status'],
+    reminders,
+    createdAt: r.created_at as string,
+    updatedAt: r.updated_at as string
+  }
+}
+
+function rowToTask(r: Record<string, unknown>): Task {
+  return {
+    id: r.id as string,
+    title: r.title as string,
+    notes: (r.notes as string | null) ?? null,
+    dueAt: (r.due_at as string | null) ?? null,
+    completedAt: (r.completed_at as string | null) ?? null,
+    status: r.status as Task['status'],
+    createdAt: r.created_at as string,
+    updatedAt: r.updated_at as string
+  }
+}
+
+export class CalendarService {
+  private db: DB
+
+  constructor(db: DB) {
+    this.db = db
+  }
+
+  async backupTo(destination: string): Promise<void> {
+    await this.db.backup(destination)
+  }
+
+  // ---------- calendars ----------
+
+  listCalendars(): Calendar[] {
+    return (this.db.prepare('SELECT * FROM calendars ORDER BY is_primary DESC, name').all() as Record<string, unknown>[]).map(rowToCalendar)
+  }
+
+  createCalendar(input: CreateCalendarInput): Calendar {
+    const name = input.name.trim()
+    if (!name) throw new Error('日历名称不能为空')
+    if (name.length > 40) throw new Error('日历名称不能超过 40 个字符')
+    const color = input.color?.trim() || '#1a73e8'
+    if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error('日历颜色格式无效')
+    const id = `cal-${randomUUID()}`
+    const now = nowIso()
+    this.db.prepare(
+      'INSERT INTO calendars (id, name, color, is_primary, is_visible, time_zone, created_at, updated_at) VALUES (?, ?, ?, 0, 1, ?, ?, ?)'
+    ).run(id, name, color, input.timeZone?.trim() || 'Asia/Shanghai', now, now)
+    return this.getCalendar(id)!
+  }
+
+  updateCalendar(id: string, patch: { name?: string; color?: string; isVisible?: boolean }): Calendar | null {
+    const cur = this.db.prepare('SELECT * FROM calendars WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    if (!cur) throw new Error(`日历不存在: ${id}`)
+    if (id === HOLIDAY_CALENDAR_ID) throw new Error('中国节假日为内置只读日历，不能修改')
+    const name = patch.name !== undefined ? patch.name.trim() : (cur.name as string)
+    if (!name) throw new Error('日历名称不能为空')
+    const color = patch.color ?? (cur.color as string)
+    const isVisible = patch.isVisible ?? !!cur.is_visible
+    this.db
+      .prepare('UPDATE calendars SET name = ?, color = ?, is_visible = ?, updated_at = ? WHERE id = ?')
+      .run(name, color, isVisible ? 1 : 0, nowIso(), id)
+    return this.getCalendar(id)
+  }
+
+  deleteCalendar(id: string): boolean {
+    const calendar = this.getCalendar(id)
+    if (!calendar) throw new Error(`日历不存在: ${id}`)
+    if (calendar.isPrimary || id === HOLIDAY_CALENDAR_ID) throw new Error('默认日历和节假日日历不能删除')
+    const fallback = this.getCalendar('personal')
+    if (!fallback) throw new Error('缺少默认个人日历')
+    const tx = this.db.transaction(() => {
+      this.db.prepare('UPDATE events SET calendar_id = ?, updated_at = ? WHERE calendar_id = ?').run(fallback.id, nowIso(), id)
+      return this.db.prepare('DELETE FROM calendars WHERE id = ?').run(id).changes > 0
+    })
+    return tx()
+  }
+
+  getCalendar(id: string): Calendar | null {
+    const r = this.db.prepare('SELECT * FROM calendars WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return r ? rowToCalendar(r) : null
+  }
+
+  // ---------- events ----------
+
+  createEvent(input: CreateEventInput): CalendarEvent {
+    const start = parseWhen(input.start)
+    let end = input.end ? parseWhen(input.end) : null
+    if (!start) throw new Error(`无法解析开始时间: "${input.start}"（支持 ISO 8601，如 2026-08-28T14:00:00 或 2026-08-28）`)
+    const isAllDay = input.isAllDay ?? /^\d{4}-\d{2}-\d{2}$/.test(input.start.trim())
+    if (!end) end = isAllDay ? start.endOf('day') : start.plus({ hours: 1 })
+    if (end <= start) throw new Error('结束时间必须晚于开始时间')
+    const calId = input.calendarId && this.getCalendar(input.calendarId) ? input.calendarId : 'personal'
+    if (calId === HOLIDAY_CALENDAR_ID) throw new Error('中国节假日为内置只读日历，不能写入')
+    const reminders = normalizeReminders(input.reminders)
+    const rrule = input.rrule?.trim() || null
+    if (rrule && !parseRule(rrule)) throw new Error(`无法解析重复规则: "${input.rrule}"（如 DAILY / WEEKLY / WEEKLY;BYDAY=MO,WE / MONTHLY / YEARLY，可加 ;INTERVAL=n / ;UNTIL=2026-12-31 / ;COUNT=n）`)
+    const id = randomUUID()
+    const now = nowIso()
+    this.db
+      .prepare(
+        `INSERT INTO events (id, calendar_id, title, description, location, start_utc, end_utc, is_all_day, color_override, rrule, status, reminders, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`
+      )
+      .run(
+        id,
+        calId,
+        input.title.trim() || '（无标题）',
+        input.description ?? null,
+        input.location ?? null,
+        start.toUTC().toISO(),
+        end.toUTC().toISO(),
+        isAllDay ? 1 : 0,
+        input.colorOverride ?? null,
+        rrule,
+        JSON.stringify(reminders),
+        now,
+        now
+      )
+    return this.getEvent(id)!
+  }
+
+  getEvent(id: string): CalendarEvent | null {
+    const r = this.db.prepare('SELECT * FROM events WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return r ? rowToEvent(r) : null
+  }
+
+  listEvents(from?: string, to?: string, calendarId?: string): CalendarEvent[] {
+    const conds: string[] = ["status = 'confirmed'"]
+    const args: unknown[] = []
+    let rangeFrom: DateTime | null = null
+    let rangeTo: DateTime | null = null
+    if (from) {
+      const f = parseWhen(from)
+      if (f) {
+        conds.push('end_utc > ?')
+        args.push(f.toUTC().toISO())
+        rangeFrom = f
+      }
+    }
+    if (to) {
+      const t = parseWhen(to, true)
+      if (t) {
+        conds.push('start_utc <= ?')
+        args.push(t.toUTC().toISO())
+        rangeTo = t
+      }
+    }
+    if (calendarId) {
+      conds.push('calendar_id = ?')
+      args.push(calendarId)
+    }
+    const windowed = rangeFrom !== null && rangeTo !== null
+    if (windowed) conds.push('rrule IS NULL')
+    const rows = this.db
+      .prepare(`SELECT * FROM events WHERE ${conds.join(' AND ')} ORDER BY start_utc`)
+      .all(...args) as Record<string, unknown>[]
+    const events = rows.map(rowToEvent)
+    if (windowed) {
+      const recArgs: unknown[] = []
+      const recConds = ["status = 'confirmed'", 'rrule IS NOT NULL']
+      if (calendarId) {
+        recConds.push('calendar_id = ?')
+        recArgs.push(calendarId)
+      }
+      const recurring = this.db
+        .prepare(`SELECT * FROM events WHERE ${recConds.join(' AND ')} ORDER BY start_utc`)
+        .all(...recArgs) as Record<string, unknown>[]
+      for (const r of recurring) {
+        events.push(...expandRecurring(rowToEvent(r), rangeFrom!, rangeTo!))
+      }
+      if (calendarId !== HOLIDAY_CALENDAR_ID) {
+        events.push(...this.holidayEvents(rangeFrom!, rangeTo!))
+      }
+      events.sort((a, b) => a.startUtc.localeCompare(b.startUtc))
+    }
+    return events
+  }
+
+  private holidayEvents(from: DateTime, to: DateTime): CalendarEvent[] {
+    const start = from.startOf('day')
+    const end = to.endOf('day')
+    if (end <= start) return []
+    return getHolidays(start, end).map((h) => {
+      const dayStart = DateTime.fromISO(h.date).startOf('day')
+      return {
+        id: `holiday-${h.date}`,
+        calendarId: HOLIDAY_CALENDAR_ID,
+        title: h.name,
+        description: null,
+        location: null,
+        startUtc: dayStart.toUTC().toISO()!,
+        endUtc: dayStart.endOf('day').toUTC().toISO()!,
+        isAllDay: true,
+        colorOverride: null,
+        rrule: null,
+        status: 'confirmed' as const,
+        reminders: [],
+        createdAt: dayStart.toISO()!,
+        updatedAt: dayStart.toISO()!
+      }
+    })
+  }
+
+  searchEvents(query: string): CalendarEvent[] {
+    const q = `%${query.trim()}%`
+    const rows = this.db
+      .prepare(
+        "SELECT * FROM events WHERE status = 'confirmed' AND (title LIKE ? OR description LIKE ? OR location LIKE ?) ORDER BY start_utc LIMIT 100"
+      )
+      .all(q, q, q) as Record<string, unknown>[]
+    return rows.map(rowToEvent)
+  }
+
+  updateEvent(id: string, patch: UpdateEventInput): CalendarEvent | null {
+    const cur = this.db.prepare('SELECT * FROM events WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    if (!cur) throw new Error(`日程不存在: ${id}`)
+    let startUtc = cur.start_utc as string
+    let endUtc = cur.end_utc as string
+    if (patch.start) {
+      const s = parseWhen(patch.start)
+      if (!s) throw new Error(`无法解析开始时间: "${patch.start}"`)
+      startUtc = s.toUTC().toISO()!
+    }
+    if (patch.end) {
+      const e = parseWhen(patch.end)
+      if (!e) throw new Error(`无法解析结束时间: "${patch.end}"`)
+      endUtc = e.toUTC().toISO()!
+    }
+    if (DateTime.fromISO(endUtc) <= DateTime.fromISO(startUtc)) throw new Error('结束时间必须晚于开始时间')
+    const title = patch.title ?? (cur.title as string)
+    const description = patch.description !== undefined ? patch.description : (cur.description as string | null)
+    const location = patch.location !== undefined ? patch.location : (cur.location as string | null)
+    const isAllDay = patch.isAllDay ?? !!cur.is_all_day
+    const calendarId = patch.calendarId ?? (cur.calendar_id as string)
+    if (calendarId === HOLIDAY_CALENDAR_ID) throw new Error('中国节假日为内置只读日历，不能写入')
+    const colorOverride = patch.colorOverride !== undefined ? patch.colorOverride : (cur.color_override as string | null)
+    const status = patch.status ?? (cur.status as string)
+    const reminders = patch.reminders !== undefined ? normalizeReminders(patch.reminders) : rowToEvent(cur).reminders
+    let rrule: string | null
+    if (patch.rrule !== undefined) {
+      rrule = patch.rrule?.trim() || null
+      if (rrule && !parseRule(rrule)) throw new Error(`无法解析重复规则: "${patch.rrule}"`)
+    } else {
+      rrule = (cur.rrule as string | null) ?? null
+    }
+    this.db
+      .prepare(
+        `UPDATE events SET title = ?, description = ?, location = ?, start_utc = ?, end_utc = ?, is_all_day = ?, calendar_id = ?, color_override = ?, status = ?, reminders = ?, rrule = ?, updated_at = ? WHERE id = ?`
+      )
+      .run(title, description, location, startUtc, endUtc, isAllDay ? 1 : 0, calendarId, colorOverride, status, JSON.stringify(reminders), rrule, nowIso(), id)
+    return this.getEvent(id)
+  }
+
+  deleteEvent(id: string): boolean {
+    return this.db.prepare('DELETE FROM events WHERE id = ?').run(id).changes > 0
+  }
+
+  // ---------- tasks ----------
+
+  createTask(input: CreateTaskInput): Task {
+    const due = input.dueAt ? parseWhen(input.dueAt, true) : null
+    const id = randomUUID()
+    const now = nowIso()
+    this.db
+      .prepare('INSERT INTO tasks (id, title, notes, due_at, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(id, input.title.trim() || '（无标题）', input.notes ?? null, due ? due.toUTC().toISO() : null, 'needsAction', now, now)
+    return this.getTask(id)!
+  }
+
+  getTask(id: string): Task | null {
+    const r = this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return r ? rowToTask(r) : null
+  }
+
+  listTasks(filter?: { status?: 'needsAction' | 'completed' | 'all'; dueBefore?: string }): Task[] {
+    let sql = 'SELECT * FROM tasks'
+    const conds: string[] = []
+    const args: unknown[] = []
+    if (filter?.status && filter.status !== 'all') {
+      conds.push('status = ?')
+      args.push(filter.status)
+    }
+    if (filter?.dueBefore) {
+      const d = parseWhen(filter.dueBefore, true)
+      if (d) {
+        conds.push('due_at <= ?')
+        args.push(d.toUTC().toISO())
+      }
+    }
+    if (conds.length) sql += ' WHERE ' + conds.join(' AND ')
+    sql += " ORDER BY completed_at IS NULL DESC, due_at IS NULL, due_at, created_at"
+    const rows = this.db.prepare(sql).all(...args) as Record<string, unknown>[]
+    return rows.map(rowToTask)
+  }
+
+  updateTask(id: string, patch: UpdateTaskInput): Task | null {
+    const cur = this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    if (!cur) throw new Error(`待办不存在: ${id}`)
+    const title = patch.title ?? (cur.title as string)
+    const notes = patch.notes !== undefined ? patch.notes : (cur.notes as string | null)
+    let dueAt = cur.due_at as string | null
+    if (patch.dueAt !== undefined) {
+      const d = patch.dueAt ? parseWhen(patch.dueAt, true) : null
+      dueAt = d ? d.toUTC().toISO() : null
+    }
+    let status = cur.status as string
+    let completedAt = cur.completed_at as string | null
+    if (patch.completed !== undefined) {
+      if (patch.completed) {
+        status = 'completed'
+        completedAt = nowIso()
+      } else {
+        status = 'needsAction'
+        completedAt = null
+      }
+    }
+    this.db
+      .prepare('UPDATE tasks SET title = ?, notes = ?, due_at = ?, status = ?, completed_at = ?, updated_at = ? WHERE id = ?')
+      .run(title, notes, dueAt, status, completedAt, nowIso(), id)
+    return this.getTask(id)
+  }
+
+  deleteTask(id: string): boolean {
+    return this.db.prepare('DELETE FROM tasks WHERE id = ?').run(id).changes > 0
+  }
+
+  // ---------- agenda ----------
+
+  getTodayAgenda(): { date: string; events: CalendarEvent[]; tasks: Task[] } {
+    const today = DateTime.now().startOf('day')
+    const events = this.listEvents(today.toISODate()!, today.toISODate()!)
+    const tasks = this.listTasks({ status: 'needsAction' })
+    return { date: today.toISODate()!, events, tasks }
+  }
+}

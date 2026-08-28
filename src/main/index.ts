@@ -1,0 +1,272 @@
+import { app, BrowserWindow, dialog, ipcMain, Menu, screen, shell, Tray, Notification } from 'electron'
+import { dirname, join } from 'node:path'
+import { createServer, type Server } from 'node:http'
+import { randomBytes } from 'node:crypto'
+import { DateTime } from 'luxon'
+import { openDatabase } from '../shared/db'
+import { CalendarService } from '../shared/service'
+import { createMethodTable } from '../shared/rpc-methods'
+import { getRpcInfoPath, getDataDir } from '../shared/paths'
+import { writeFileSync, mkdirSync, rmSync } from 'node:fs'
+
+function configurePortableStorage(): void {
+  if (!app.isPackaged) return
+  const executableDir = process.env.PORTABLE_EXECUTABLE_DIR?.trim() || dirname(process.execPath)
+  const dataDir = join(executableDir, 'data')
+  process.env.LOCAL_CALENDAR_DATA_DIR = dataDir
+  app.setPath('userData', dataDir)
+  app.setPath('sessionData', join(dataDir, 'session'))
+  app.setPath('logs', join(dataDir, 'logs'))
+}
+
+configurePortableStorage()
+const svc = new CalendarService(openDatabase())
+const { methods, mutating } = createMethodTable(svc)
+
+methods.set('debug.evaluate', async (p: Record<string, unknown>) => {
+  const win = BrowserWindow.getAllWindows()[0]
+  if (!win) throw new Error('没有可用窗口')
+  return win.webContents.executeJavaScript(p.code as string)
+})
+
+methods.set('debug.screenshot', async (p: Record<string, unknown>) => {
+  const win = BrowserWindow.getAllWindows()[0]
+  if (!win) throw new Error('没有可用窗口')
+  if (p.view === 'month') {
+    await win.webContents.executeJavaScript(`window.__setView && window.__setView('month')`).catch(() => {})
+  }
+  if (p.dialog === 'create') {
+    await win.webContents.executeJavaScript(`window.__openCreate && window.__openCreate()`).catch(() => {})
+  }
+  if (p.tasks === true) {
+    await win.webContents.executeJavaScript(`window.__openTasks && window.__openTasks()`).catch(() => {})
+  }
+  if (p.view || p.dialog || p.tasks) await new Promise((r) => setTimeout(r, 600))
+  const img = await win.webContents.capturePage()
+  const dir = join(getDataDir(), 'shots')
+  mkdirSync(dir, { recursive: true })
+  const path = join(dir, `view-${Date.now()}.png`)
+  writeFileSync(path, img.toPNG())
+  return { path }
+})
+
+async function dispatch(
+  method: string,
+  params: Record<string, unknown>
+): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
+  const fn = methods.get(method)
+  if (!fn) return { ok: false, error: `未知方法: ${method}` }
+  try {
+    return { ok: true, data: await fn(params ?? {}) }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+let rpcServer: Server | null = null
+let tray: Tray | null = null
+let isQuitting = false
+
+function startRpcServer(getWindows: () => BrowserWindow[]): void {
+  const token = randomBytes(24).toString('hex')
+  rpcServer = createServer((req, res) => {
+    if (req.method !== 'POST' || req.url !== '/rpc') {
+      res.writeHead(404).end()
+      return
+    }
+    const auth = req.headers.authorization || ''
+    if (auth !== `Bearer ${token}`) {
+      res.writeHead(401, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ ok: false, error: 'unauthorized' }))
+      return
+    }
+    let body = ''
+    req.on('data', (chunk) => {
+      body += chunk
+      if (body.length > 1_000_000) req.destroy()
+    })
+    req.on('end', async () => {
+      let method = ''
+      let params: Record<string, unknown> = {}
+      try {
+        const parsed = JSON.parse(body || '{}')
+        method = parsed.method
+        params = parsed.params ?? {}
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: false, error: 'invalid JSON' }))
+        return
+      }
+      const result = await dispatch(method, params)
+      if (result.ok && mutating.has(method)) {
+        for (const win of getWindows()) win.webContents.send('data-changed', { method })
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify(result))
+    })
+  })
+  rpcServer.listen(0, '127.0.0.1', () => {
+    const addr = rpcServer!.address()
+    if (addr && typeof addr === 'object') {
+      writeFileSync(getRpcInfoPath(), JSON.stringify({ port: addr.port, token }, null, 2))
+      console.log(`[local-calendar] RPC listening on 127.0.0.1:${addr.port}`)
+    }
+  })
+}
+
+function createWindow(): void {
+  const workArea = screen.getPrimaryDisplay().workAreaSize
+  const win = new BrowserWindow({
+    width: Math.min(1440, workArea.width),
+    height: Math.min(860, workArea.height),
+    minWidth: 1024,
+    minHeight: 680,
+    backgroundColor: '#ffffff',
+    autoHideMenuBar: true,
+    frame: false,
+    title: '本地日历',
+    icon: join(__dirname, '../renderer/icon.ico'),
+    show: false,
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.mjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
+    }
+  })
+  win.on('close', (event) => {
+    if (isQuitting) return
+    event.preventDefault()
+    win.hide()
+  })
+  win.on('ready-to-show', () => win.show())
+  if (process.env.ELECTRON_RENDERER_URL) {
+    void win.loadURL(process.env.ELECTRON_RENDERER_URL)
+  } else {
+    void win.loadFile(join(__dirname, '../renderer/index.html'))
+  }
+}
+
+function createTray(): void {
+  if (tray) return
+  tray = new Tray(join(__dirname, '../renderer/icon.ico'))
+  tray.setToolTip('本地日历')
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: '打开本地日历', click: () => BrowserWindow.getAllWindows()[0]?.show() },
+      { type: 'separator' },
+      { label: '退出', click: () => { isQuitting = true; app.quit() } }
+    ])
+  )
+  tray.on('double-click', () => BrowserWindow.getAllWindows()[0]?.show())
+}
+
+// ---------- 提醒调度：每 30 秒检查即将开始的日程 ----------
+
+const firedReminders = new Set<string>()
+
+function fireReminder(evtTitle: string, when: DateTime, leadMin: number): void {
+  const timeLabel = when.toFormat('HH:mm')
+  const body = leadMin > 0 ? `${timeLabel} 开始（提前 ${leadMin} 分钟提醒）` : `${timeLabel} 开始`
+  try {
+    const n = new Notification({ title: evtTitle, body })
+    n.on('click', () => {
+      for (const win of BrowserWindow.getAllWindows()) win.show()
+    })
+    n.show()
+  } catch {
+    // 系统通知失败时仍显示应用内提示
+  }
+  for (const win of BrowserWindow.getAllWindows()) win.webContents.send('app-toast', `提醒：${evtTitle} · ${body}`)
+}
+
+function checkReminders(): void {
+  const now = DateTime.now()
+  const from = now.minus({ days: 1 }).toFormat('yyyy-MM-dd')
+  const to = now.plus({ days: 8 }).toFormat('yyyy-MM-dd')
+  let events
+  try {
+    events = svc.listEvents(from, to)
+  } catch {
+    return
+  }
+  for (const evt of events) {
+    if (!evt.reminders?.length) continue
+    const start = DateTime.fromISO(evt.startUtc)
+    if (!start.isValid) continue
+    for (const r of evt.reminders) {
+      if (!Number.isFinite(r.minutes) || r.minutes < 0) continue
+      const key = `${evt.id}|${evt.startUtc}|${r.minutes}`
+      if (firedReminders.has(key)) continue
+      const fireAt = start.minus({ minutes: r.minutes })
+      const diffSec = now.diff(fireAt, 'seconds').seconds
+      if (diffSec >= 0 && diffSec < 60) {
+        firedReminders.add(key)
+        fireReminder(evt.title, start, r.minutes)
+      }
+    }
+  }
+}
+
+app.whenReady().then(() => {
+  app.setAppUserModelId('com.local.calendar')
+  ipcMain.handle('rpc', async (_e, method: string, params: Record<string, unknown>) => {
+    const result = await dispatch(method, params ?? {})
+    if (result.ok && mutating.has(method)) {
+      for (const win of BrowserWindow.getAllWindows()) win.webContents.send('data-changed', { method })
+    }
+    return result
+  })
+  ipcMain.on('window-minimize', (event) => BrowserWindow.fromWebContents(event.sender)?.minimize())
+  ipcMain.on('window-toggle-maximize', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win) return
+    if (win.isMaximized()) win.unmaximize()
+    else win.maximize()
+  })
+  ipcMain.on('window-close', (event) => BrowserWindow.fromWebContents(event.sender)?.close())
+  ipcMain.handle('open-data-dir', async () => {
+    const dataDir = getDataDir()
+    await shell.openPath(dataDir)
+    return dataDir
+  })
+  ipcMain.handle('backup-data', async () => {
+    const result = await dialog.showSaveDialog({
+      title: '备份本地日历数据',
+      defaultPath: join(getDataDir(), `calendar-backup-${new Date().toISOString().slice(0, 10)}.db`),
+      filters: [{ name: 'SQLite 数据库', extensions: ['db'] }]
+    })
+    if (result.canceled || !result.filePath) return null
+    await svc.backupTo(result.filePath)
+    return result.filePath
+  })
+
+  startRpcServer(() => BrowserWindow.getAllWindows())
+  createWindow()
+  createTray()
+  checkReminders()
+  setInterval(checkReminders, 30_000)
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  })
+})
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin' && isQuitting) {
+    rpcServer?.close()
+    app.quit()
+  }
+})
+
+app.on('before-quit', () => {
+  isQuitting = true
+})
+
+app.on('will-quit', () => {
+  try {
+    rmSync(getRpcInfoPath(), { force: true })
+  } catch {
+    // 清理失败不影响退出，CLI 侧有连接失败自动回退
+  }
+})

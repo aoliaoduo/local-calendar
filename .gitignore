@@ -1,0 +1,12 @@
+node_modules/
+dist/
+out/
+release/
+portable-*/
+*.db
+*.db-wal
+*.db-shm
+rpc.json
+*.log
+.VSCodeCounter/
+.tmp-*.mjs

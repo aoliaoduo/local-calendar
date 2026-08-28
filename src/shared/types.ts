@@ -1,0 +1,98 @@
+export interface Calendar {
+  id: string
+  name: string
+  color: string
+  isPrimary: boolean
+  isVisible: boolean
+  timeZone: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateCalendarInput {
+  name: string
+  color?: string
+  timeZone?: string
+}
+
+export type EventStatus = 'confirmed' | 'cancelled'
+
+export interface Reminder {
+  minutes: number
+  method: 'popup'
+}
+
+export interface CalendarEvent {
+  id: string
+  calendarId: string
+  title: string
+  description: string | null
+  location: string | null
+  startUtc: string
+  endUtc: string
+  isAllDay: boolean
+  colorOverride: string | null
+  rrule: string | null
+  status: EventStatus
+  reminders: Reminder[]
+  createdAt: string
+  updatedAt: string
+}
+
+export type TaskStatus = 'needsAction' | 'completed'
+
+export interface Task {
+  id: string
+  title: string
+  notes: string | null
+  dueAt: string | null
+  completedAt: string | null
+  status: TaskStatus
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateEventInput {
+  calendarId?: string
+  title: string
+  description?: string
+  location?: string
+  start: string
+  end: string
+  isAllDay?: boolean
+  colorOverride?: string
+  reminders?: Reminder[]
+  rrule?: string | null
+}
+
+export interface UpdateEventInput {
+  title?: string
+  description?: string | null
+  location?: string | null
+  start?: string
+  end?: string
+  isAllDay?: boolean
+  calendarId?: string
+  colorOverride?: string | null
+  status?: EventStatus
+  reminders?: Reminder[]
+  rrule?: string | null
+}
+
+export interface CreateTaskInput {
+  title: string
+  notes?: string
+  dueAt?: string
+}
+
+export interface UpdateTaskInput {
+  title?: string
+  notes?: string | null
+  dueAt?: string | null
+  completed?: boolean
+}
+
+export interface RpcRequest {
+  method: string
+  params: Record<string, unknown>
+}
