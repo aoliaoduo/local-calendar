@@ -167,6 +167,11 @@ function normalizeReminders(value: Reminder[] | undefined): Reminder[] {
   return [...reminders.values()].sort((first, second) => second.minutes - first.minutes)
 }
 
+function normalizeTaskReminder(value: number): number {
+  if (!Number.isInteger(value) || value < 0 || value > 10080) throw new Error('任务提醒分钟数必须是 0–10080 的整数')
+  return value
+}
+
 function parseExdates(value: unknown): string[] {
   if (typeof value !== 'string') return []
   try {
@@ -228,6 +233,7 @@ function rowToTask(r: Record<string, unknown>): Task {
     title: r.title as string,
     notes: (r.notes as string | null) ?? null,
     dueAt: (r.due_at as string | null) ?? null,
+    reminderMinutes: typeof r.reminder_minutes === 'number' ? r.reminder_minutes : null,
     completedAt: (r.completed_at as string | null) ?? null,
     status: r.status as Task['status'],
     createdAt: r.created_at as string,
@@ -521,9 +527,12 @@ export class CalendarService {
     const due = input.dueAt ? parseWhen(input.dueAt, true) : null
     const id = randomUUID()
     const now = nowIso()
+    const reminderMinutes = input.reminderMinutes !== undefined && input.reminderMinutes !== null
+      ? normalizeTaskReminder(input.reminderMinutes)
+      : null
     this.db
-      .prepare('INSERT INTO tasks (id, title, notes, due_at, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(id, input.title.trim() || '（无标题）', input.notes ?? null, due ? due.toUTC().toISO() : null, 'needsAction', now, now)
+      .prepare('INSERT INTO tasks (id, title, notes, due_at, reminder_minutes, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(id, input.title.trim() || '（无标题）', input.notes ?? null, due ? due.toUTC().toISO() : null, reminderMinutes, 'needsAction', now, now)
     return this.getTask(id)!
   }
 
@@ -563,6 +572,9 @@ export class CalendarService {
       const d = patch.dueAt ? parseWhen(patch.dueAt, true) : null
       dueAt = d ? d.toUTC().toISO() : null
     }
+    const reminderMinutes = patch.reminderMinutes !== undefined
+      ? (patch.reminderMinutes === null ? null : normalizeTaskReminder(patch.reminderMinutes))
+      : (typeof cur.reminder_minutes === 'number' ? cur.reminder_minutes : null)
     let status = cur.status as string
     let completedAt = cur.completed_at as string | null
     if (patch.completed !== undefined) {
@@ -575,8 +587,8 @@ export class CalendarService {
       }
     }
     this.db
-      .prepare('UPDATE tasks SET title = ?, notes = ?, due_at = ?, status = ?, completed_at = ?, updated_at = ? WHERE id = ?')
-      .run(title, notes, dueAt, status, completedAt, nowIso(), id)
+      .prepare('UPDATE tasks SET title = ?, notes = ?, due_at = ?, reminder_minutes = ?, status = ?, completed_at = ?, updated_at = ? WHERE id = ?')
+      .run(title, notes, dueAt, reminderMinutes, status, completedAt, nowIso(), id)
     return this.getTask(id)
   }
 

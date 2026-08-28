@@ -47,6 +47,7 @@ export interface Task {
   title: string
   notes: string | null
   dueAt: string | null
+  reminderMinutes: number | null
   completedAt: string | null
   status: TaskStatus
   createdAt: string
@@ -84,12 +85,14 @@ export interface CreateTaskInput {
   title: string
   notes?: string
   dueAt?: string
+  reminderMinutes?: number | null
 }
 
 export interface UpdateTaskInput {
   title?: string
   notes?: string | null
   dueAt?: string | null
+  reminderMinutes?: number | null
   completed?: boolean
 }
 

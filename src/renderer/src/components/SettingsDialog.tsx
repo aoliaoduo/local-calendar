@@ -14,6 +14,7 @@ interface SettingsDialogProps {
   onOpenDataDir: () => Promise<string>
   onBackup: () => Promise<string | null>
   onRestore: () => Promise<string | null>
+  onImportIcs: () => Promise<number>
   onClose: () => void
 }
 
@@ -29,6 +30,7 @@ export default function SettingsDialog({
   onOpenDataDir,
   onBackup,
   onRestore,
+  onImportIcs,
   onClose
 }: SettingsDialogProps) {
   const [newName, setNewName] = useState('')
@@ -88,6 +90,17 @@ export default function SettingsDialog({
       await onRestore()
     } catch (err) {
       setError(err instanceof Error ? err.message : '恢复失败')
+      setBusy(false)
+    }
+  }
+
+  const importIcs = async () => {
+    setBusy(true)
+    try {
+      await onImportIcs()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '导入 ICS 失败')
+    } finally {
       setBusy(false)
     }
   }
@@ -172,6 +185,7 @@ export default function SettingsDialog({
             <button className="btn-text compact" disabled={busy} onClick={() => void openDataDir()}>打开数据目录</button>
             <button className="btn-text compact" disabled={busy} onClick={() => void backup()}>备份数据</button>
             <button className="btn-text compact" disabled={busy} onClick={() => void restore()}>恢复备份</button>
+            <button className="btn-text compact" disabled={busy} onClick={() => void importIcs()}>导入 ICS</button>
           </div>
           <button className="btn-text" onClick={onClose}>完成</button>
         </div>

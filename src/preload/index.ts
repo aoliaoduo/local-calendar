@@ -18,5 +18,6 @@ contextBridge.exposeInMainWorld('calendarApi', {
   windowClose: () => ipcRenderer.send('window-close'),
   openDataDir: () => ipcRenderer.invoke('open-data-dir') as Promise<string>,
   backupData: () => ipcRenderer.invoke('backup-data') as Promise<string | null>,
-  restoreData: () => ipcRenderer.invoke('restore-data') as Promise<string | null>
+  restoreData: () => ipcRenderer.invoke('restore-data') as Promise<string | null>,
+  importIcs: () => ipcRenderer.invoke('import-ics') as Promise<number>
 })

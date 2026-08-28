@@ -169,6 +169,15 @@ export default function App() {
     return path
   }
 
+  const handleImportIcs = async () => {
+    const count = await window.calendarApi.importIcs()
+    if (count > 0) {
+      await loadEvents()
+      setToast(`已导入 ${count} 条日程`)
+    }
+    return count
+  }
+
   return (
     <div className="app">
       <TopBar
@@ -259,6 +268,7 @@ export default function App() {
           onOpenDataDir={handleOpenDataDir}
           onBackup={handleBackup}
           onRestore={handleRestore}
+          onImportIcs={handleImportIcs}
           onClose={() => setSettingsOpen(false)}
         />
       )}

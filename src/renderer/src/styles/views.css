@@ -870,6 +870,30 @@
   padding-bottom: 3px;
 }
 
+.task-edit-form select,
+.task-add-reminder {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--divider);
+  padding: 4px 0;
+  background: transparent;
+  color: var(--text-1);
+}
+
+.task-reminder {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  color: var(--g-blue-text);
+  font-size: 12px;
+}
+
+.task-reminder .material-icons {
+  font-size: 14px;
+  color: var(--g-blue);
+}
+
 .task-edit {
   opacity: 0;
   width: 28px;

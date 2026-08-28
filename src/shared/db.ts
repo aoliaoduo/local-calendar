@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   title TEXT NOT NULL,
   notes TEXT,
   due_at TEXT,
+  reminder_minutes INTEGER,
   completed_at TEXT,
   status TEXT NOT NULL DEFAULT 'needsAction',
   created_at TEXT NOT NULL,
@@ -64,6 +65,10 @@ function migrateSchema(db: DB): void {
   }
   if (!eventColumns.some((column) => column.name === 'exdates')) {
     db.exec("ALTER TABLE events ADD COLUMN exdates TEXT NOT NULL DEFAULT '[]'")
+  }
+  const taskColumns = db.prepare('PRAGMA table_info(tasks)').all() as { name: string }[]
+  if (!taskColumns.some((column) => column.name === 'reminder_minutes')) {
+    db.exec('ALTER TABLE tasks ADD COLUMN reminder_minutes INTEGER')
   }
 }
 

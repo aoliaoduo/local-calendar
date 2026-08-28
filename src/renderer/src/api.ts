@@ -14,6 +14,7 @@ interface CalendarApi {
   openDataDir: () => Promise<string>
   backupData: () => Promise<string | null>
   restoreData: () => Promise<string | null>
+  importIcs: () => Promise<number>
 }
 
 declare global {
@@ -60,6 +61,7 @@ export interface TaskInfo {
   title: string
   notes: string | null
   dueAt: string | null
+  reminderMinutes: number | null
   status: 'needsAction' | 'completed'
 }
 
@@ -80,7 +82,7 @@ export const api = {
     rpc<boolean>('events.deleteOccurrence', { id, occurrenceIndex }),
   listTasks: (status: 'needsAction' | 'completed' | 'all' = 'needsAction') =>
     rpc<TaskInfo[]>('tasks.list', { filter: { status } }),
-  createTask: (input: { title: string; notes?: string; dueAt?: string }) => rpc<TaskInfo>('tasks.create', input),
+  createTask: (input: { title: string; notes?: string; dueAt?: string; reminderMinutes?: number | null }) => rpc<TaskInfo>('tasks.create', input),
   updateTask: (id: string, patch: Record<string, unknown>) => rpc<TaskInfo | null>('tasks.update', { id, patch }),
   deleteTask: (id: string) => rpc<boolean>('tasks.delete', { id })
 }

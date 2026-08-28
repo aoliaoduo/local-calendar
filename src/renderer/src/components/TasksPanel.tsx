@@ -13,11 +13,13 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const [newTitle, setNewTitle] = useState('')
   const today = DateTime.now().toISODate()!
   const [newDue, setNewDue] = useState(today)
+  const [newReminder, setNewReminder] = useState('')
   const [showDone, setShowDone] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [editDue, setEditDue] = useState('')
   const [editNotes, setEditNotes] = useState('')
+  const [editReminder, setEditReminder] = useState('')
 
   const load = async () => {
     setTasks(await api.listTasks('all'))
@@ -32,9 +34,10 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const handleAdd = async () => {
     const title = newTitle.trim()
     if (!title) return
-    await api.createTask({ title, dueAt: newDue || undefined })
+    await api.createTask({ title, dueAt: newDue || undefined, reminderMinutes: newReminder === '' ? null : Number(newReminder) })
     setNewTitle('')
     setNewDue(today)
+    setNewReminder('')
     setAdding(false)
     onToast('已添加任务')
     void load()
@@ -45,12 +48,13 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
     setEditTitle(task.title)
     setEditDue(task.dueAt ? DateTime.fromISO(task.dueAt).toLocal().toFormat('yyyy-MM-dd') : '')
     setEditNotes(task.notes ?? '')
+    setEditReminder(task.reminderMinutes === null ? '' : String(task.reminderMinutes))
   }
 
   const saveEdit = async () => {
     if (!editingId || !editTitle.trim()) return
     try {
-      await api.updateTask(editingId, { title: editTitle.trim(), dueAt: editDue || null, notes: editNotes.trim() || null })
+      await api.updateTask(editingId, { title: editTitle.trim(), dueAt: editDue || null, notes: editNotes.trim() || null, reminderMinutes: editReminder === '' ? null : Number(editReminder) })
       setEditingId(null)
       onToast('已更新任务')
       await load()
@@ -81,6 +85,13 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
           <div className="task-edit-form">
             <input autoFocus value={editTitle} onChange={(event) => setEditTitle(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void saveEdit(); if (event.key === 'Escape') setEditingId(null) }} />
             <input type="date" value={editDue} onChange={(event) => setEditDue(event.target.value)} />
+            <select value={editReminder} onChange={(event) => setEditReminder(event.target.value)}>
+              <option value="">不提醒</option>
+              <option value="0">截止时提醒</option>
+              <option value="10">提前 10 分钟</option>
+              <option value="30">提前 30 分钟</option>
+              <option value="60">提前 1 小时</option>
+            </select>
             <input placeholder="备注（可选）" value={editNotes} onChange={(event) => setEditNotes(event.target.value)} />
             <div className="task-add-actions">
               <button className="btn-text compact" onClick={() => void saveEdit()}>保存</button>
@@ -96,7 +107,8 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
                 {dueDate.toFormat('M月d日')}
               </div>
             )}
-            {t.notes && <div className="task-notes">{t.notes}</div>}
+          {t.notes && <div className="task-notes">{t.notes}</div>}
+          {t.reminderMinutes !== null && <div className="task-reminder"><span className="material-icons">notifications</span>已设置提醒</div>}
           </div>
         )}
         {editingId !== t.id && (
@@ -156,6 +168,13 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
               value={newDue}
               onChange={(e) => setNewDue(e.target.value)}
             />
+            <select className="task-add-reminder" value={newReminder} onChange={(event) => setNewReminder(event.target.value)}>
+              <option value="">不提醒</option>
+              <option value="0">截止时提醒</option>
+              <option value="10">提前 10 分钟</option>
+              <option value="30">提前 30 分钟</option>
+              <option value="60">提前 1 小时</option>
+            </select>
             <div className="task-add-actions">
               <button className="btn-text" onClick={() => void handleAdd()}>
                 保存

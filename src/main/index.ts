@@ -7,7 +7,8 @@ import { openDatabase } from '../shared/db'
 import { CalendarService } from '../shared/service'
 import { createMethodTable } from '../shared/rpc-methods'
 import { getDbPath, getRpcInfoPath, getDataDir } from '../shared/paths'
-import { existsSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import type { Task } from '../shared/types'
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, statSync, unlinkSync } from 'node:fs'
 
 function configurePortableStorage(): void {
   if (!app.isPackaged) return
@@ -200,6 +201,71 @@ function buildTrayMenu(): Menu {
   ])
 }
 
+function importIcsValue(value: string): { value: string; allDay: boolean } | null {
+  const clean = value.trim()
+  if (/^\d{8}$/.test(clean)) {
+    const date = DateTime.fromFormat(clean, 'yyyyMMdd')
+    return date.isValid ? { value: date.toFormat('yyyy-MM-dd'), allDay: true } : null
+  }
+  const date = DateTime.fromFormat(clean.replace(/Z$/, ''), "yyyyMMdd'T'HHmmss", { zone: clean.endsWith('Z') ? 'utc' : 'local' })
+  return date.isValid ? { value: date.toISO()!, allDay: false } : null
+}
+
+function unescapeIcsValue(value: string): string {
+  return value.replace(/\\n/gi, '\n').replace(/\\([\\;,])/g, '$1')
+}
+
+function importIcsFile(path: string): number {
+  const lines: string[] = []
+  for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
+    if (/^[ \t]/.test(line) && lines.length) lines[lines.length - 1] += line.slice(1)
+    else lines.push(line)
+  }
+  let fields: Record<string, string> | null = null
+  let count = 0
+  for (const line of lines) {
+    if (line === 'BEGIN:VEVENT') fields = {}
+    else if (line === 'END:VEVENT' && fields) {
+      const start = fields.DTSTART ? importIcsValue(fields.DTSTART) : null
+      const end = fields.DTEND ? importIcsValue(fields.DTEND) : null
+      if (start && fields.SUMMARY) {
+        svc.createEvent({
+          title: unescapeIcsValue(fields.SUMMARY),
+          description: fields.DESCRIPTION ? unescapeIcsValue(fields.DESCRIPTION) : undefined,
+          location: fields.LOCATION ? unescapeIcsValue(fields.LOCATION) : undefined,
+          start: start.value,
+          end: end?.value ?? (start.allDay ? DateTime.fromISO(start.value).plus({ days: 1 }).toFormat('yyyy-MM-dd') : DateTime.fromISO(start.value).plus({ hours: 1 }).toISO()!),
+          isAllDay: start.allDay,
+          rrule: fields.RRULE || undefined
+        })
+        count++
+      }
+      fields = null
+    } else if (fields) {
+      const separator = line.indexOf(':')
+      if (separator > 0) fields[line.slice(0, separator).split(';')[0].toUpperCase()] = line.slice(separator + 1)
+    }
+  }
+  return count
+}
+
+async function runAutoBackup(): Promise<void> {
+  if (!app.isPackaged) return
+  const backupDir = join(getDataDir(), 'backups')
+  mkdirSync(backupDir, { recursive: true })
+  const backupPath = join(backupDir, `auto-${new Date().toISOString().replace(/[:.]/g, '-')}.db`)
+  try {
+    await svc.backupTo(backupPath)
+    const backups = readdirSync(backupDir)
+      .filter((name) => name.startsWith('auto-') && name.endsWith('.db'))
+      .map((name) => ({ name, time: statSync(join(backupDir, name)).mtimeMs }))
+      .sort((first, second) => second.time - first.time)
+    for (const old of backups.slice(14)) unlinkSync(join(backupDir, old.name))
+  } catch {
+    // 自动备份失败不影响应用继续运行
+  }
+}
+
 // ---------- 提醒调度：每 30 秒检查即将开始的日程 ----------
 
 const firedReminders = new Set<string>()
@@ -217,6 +283,19 @@ function fireReminder(evtTitle: string, when: DateTime, leadMin: number): void {
     // 系统通知失败时仍显示应用内提示
   }
   for (const win of BrowserWindow.getAllWindows()) win.webContents.send('app-toast', `提醒：${evtTitle} · ${body}`)
+}
+
+function fireTaskReminder(taskTitle: string, dueAt: DateTime, leadMin: number): void {
+  const timeLabel = dueAt.toFormat('HH:mm')
+  const body = leadMin > 0 ? `截止 ${timeLabel}（提前 ${leadMin} 分钟提醒）` : `截止 ${timeLabel}`
+  try {
+    const n = new Notification({ title: `任务：${taskTitle}`, body })
+    n.on('click', () => BrowserWindow.getAllWindows()[0]?.show())
+    n.show()
+  } catch {
+    // 应用内提示仍会发送
+  }
+  for (const win of BrowserWindow.getAllWindows()) win.webContents.send('app-toast', `任务提醒：${taskTitle} · ${body}`)
 }
 
 function checkReminders(): void {
@@ -243,6 +322,25 @@ function checkReminders(): void {
         firedReminders.add(key)
         fireReminder(evt.title, start, r.minutes)
       }
+    }
+  }
+  let tasks: Task[]
+  try {
+    tasks = svc.listTasks({ status: 'needsAction' })
+  } catch {
+    tasks = []
+  }
+  for (const task of tasks) {
+    if (!task.dueAt || task.reminderMinutes === null) continue
+    const dueAt = DateTime.fromISO(task.dueAt)
+    if (!dueAt.isValid) continue
+    const fireAt = dueAt.minus({ minutes: task.reminderMinutes })
+    const key = `task|${task.id}|${task.updatedAt}|${task.reminderMinutes}`
+    if (firedReminders.has(key)) continue
+    const diffSec = now.diff(fireAt, 'seconds').seconds
+    if (diffSec >= 0 && diffSec < 60) {
+      firedReminders.add(key)
+      fireTaskReminder(task.title, dueAt, task.reminderMinutes)
     }
   }
 }
@@ -292,6 +390,17 @@ app.whenReady().then(() => {
     app.exit(0)
     return result.filePaths[0]
   })
+  ipcMain.handle('import-ics', async () => {
+    const result = await dialog.showOpenDialog({
+      title: '导入 ICS 日程',
+      properties: ['openFile'],
+      filters: [{ name: 'iCalendar 文件', extensions: ['ics', 'ical'] }]
+    })
+    if (result.canceled || !result.filePaths[0]) return 0
+    const count = importIcsFile(result.filePaths[0])
+    for (const win of BrowserWindow.getAllWindows()) win.webContents.send('data-changed', { method: 'events.import' })
+    return count
+  })
 
   startRpcServer(() => BrowserWindow.getAllWindows())
   createWindow()
@@ -299,6 +408,8 @@ app.whenReady().then(() => {
   setInterval(() => tray?.setContextMenu(buildTrayMenu()), 60_000)
   checkReminders()
   setInterval(checkReminders, 30_000)
+  void runAutoBackup()
+  setInterval(() => void runAutoBackup(), 6 * 60 * 60 * 1000)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
