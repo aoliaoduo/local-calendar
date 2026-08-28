@@ -203,8 +203,7 @@ export default function App() {
         }}
       />
 
-      {sidebarOpen && (
-        <SideBar
+      <SideBar
           calendars={calendars}
           anchor={cursor}
           onAnchorChange={(d) => {
@@ -216,10 +215,11 @@ export default function App() {
           }
           onToggleCalendar={handleToggleCalendar}
           onManageCalendars={() => setSettingsOpen(true)}
+          onCreateCalendar={handleCalendarCreate}
+          collapsed={!sidebarOpen}
         />
-      )}
 
-      <main className={`content${tasksOpen ? ' with-tasks' : ''}${sidebarOpen ? '' : ' no-sidebar'}`}>
+      <main className={`content${tasksOpen ? ' with-tasks' : ''}`}>
         {view === 'month' ? (
           <MonthView
             anchor={cursor}

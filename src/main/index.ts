@@ -8,12 +8,21 @@ import { CalendarService } from '../shared/service'
 import { createMethodTable } from '../shared/rpc-methods'
 import { getDbPath, getRpcInfoPath, getDataDir } from '../shared/paths'
 import type { Task } from '../shared/types'
-import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, statSync, unlinkSync } from 'node:fs'
+import { existsSync, copyFileSync, readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, statSync, unlinkSync } from 'node:fs'
 
 function configurePortableStorage(): void {
-  if (!app.isPackaged) return
-  const executableDir = process.env.PORTABLE_EXECUTABLE_DIR?.trim() || dirname(process.execPath)
+  const executableDir = app.isPackaged
+    ? process.env.PORTABLE_EXECUTABLE_DIR?.trim() || dirname(process.execPath)
+    : process.cwd()
   const dataDir = join(executableDir, 'data')
+  const legacyDir = join(process.env.APPDATA || '', 'local-calendar')
+  if (!existsSync(join(dataDir, 'calendar.db')) && existsSync(join(legacyDir, 'calendar.db'))) {
+    mkdirSync(dataDir, { recursive: true })
+    copyFileSync(join(legacyDir, 'calendar.db'), join(dataDir, 'calendar.db'))
+    for (const suffix of ['-wal', '-shm']) {
+      if (existsSync(join(legacyDir, `calendar.db${suffix}`))) copyFileSync(join(legacyDir, `calendar.db${suffix}`), join(dataDir, `calendar.db${suffix}`))
+    }
+  }
   process.env.LOCAL_CALENDAR_DATA_DIR = dataDir
   app.setPath('userData', dataDir)
   app.setPath('sessionData', join(dataDir, 'session'))

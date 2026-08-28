@@ -10,12 +10,18 @@ interface SideBarProps {
   onCreate: () => void
   onToggleCalendar: (id: string, visible: boolean) => void
   onManageCalendars: () => void
+  onCreateCalendar: (name: string, color: string) => Promise<void>
+  collapsed: boolean
 }
 
-export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, onToggleCalendar, onManageCalendars }: SideBarProps) {
+export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, onToggleCalendar, onManageCalendars, onCreateCalendar, collapsed }: SideBarProps) {
   const [miniMonth, setMiniMonth] = useState(() => anchor.startOf('month'))
   const [showMyCals, setShowMyCals] = useState(true)
   const [showOtherCals, setShowOtherCals] = useState(true)
+  const [addingCalendar, setAddingCalendar] = useState(false)
+  const [newCalendarName, setNewCalendarName] = useState('')
+  const [newCalendarColor, setNewCalendarColor] = useState('#1a73e8')
+  const [calendarError, setCalendarError] = useState('')
   const days = monthGrid(miniMonth)
   const today = DateTime.now()
 
@@ -43,7 +49,7 @@ export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, o
   )
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
       <button className="create-btn" onClick={onCreate}>
         <span className="material-icons">add</span>
         创建
@@ -88,14 +94,25 @@ export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, o
       <div className="side-group-title-row">
         <span className="side-group-title">我的日历</span>
         <div className="side-group-actions">
-          <button className="icon-btn small" title="添加日历" onClick={onManageCalendars}>
+          <button className="icon-btn small" title="快速添加日历" onClick={() => { setAddingCalendar((value) => !value); setCalendarError('') }}>
             <span className="material-icons">add</span>
+          </button>
+          <button className="icon-btn small" title="管理日历" onClick={onManageCalendars}>
+            <span className="material-icons">settings</span>
           </button>
           <button className="icon-btn small" title="展开/折叠" onClick={() => setShowMyCals((v) => !v)}>
             <span className="material-icons">{showMyCals ? 'expand_less' : 'expand_more'}</span>
           </button>
         </div>
       </div>
+      {addingCalendar && (
+        <div className="sidebar-calendar-create">
+          <input autoFocus placeholder="日历名称" value={newCalendarName} onChange={(event) => setNewCalendarName(event.target.value)} />
+          <input className="settings-color" type="color" value={newCalendarColor} onChange={(event) => setNewCalendarColor(event.target.value)} />
+          <button className="btn-text compact" disabled={!newCalendarName.trim()} onClick={() => void onCreateCalendar(newCalendarName, newCalendarColor).then(() => { setNewCalendarName(''); setAddingCalendar(false) }).catch((error) => setCalendarError(error instanceof Error ? error.message : '创建失败'))}>添加</button>
+          {calendarError && <span>{calendarError}</span>}
+        </div>
+      )}
       {showMyCals && myCals.map(renderCalRow)}
 
       <div className="side-group-title-row">
