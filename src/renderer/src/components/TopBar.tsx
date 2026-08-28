@@ -51,6 +51,7 @@ export default function TopBar({
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<EventInfo[]>([])
+  const [maximized, setMaximized] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const today = DateTime.now()
   const dayNum = today.day
@@ -59,6 +60,10 @@ export default function TopBar({
   useEffect(() => {
     if (searchOpen) inputRef.current?.focus()
   }, [searchOpen])
+
+  useEffect(() => {
+    void window.calendarApi.windowIsMaximized().then(setMaximized)
+  }, [])
 
   useEffect(() => {
     const q = query.trim()
@@ -230,8 +235,8 @@ export default function TopBar({
           <button className="window-control" title="最小化" onClick={() => window.calendarApi.windowMinimize()}>
             <span className="material-icons">remove</span>
           </button>
-          <button className="window-control" title="最大化" onClick={() => window.calendarApi.windowToggleMaximize()}>
-            <span className="material-icons">crop_square</span>
+          <button className="window-control" title={maximized ? '还原' : '最大化'} onClick={() => { window.calendarApi.windowToggleMaximize(); setMaximized((value) => !value) }}>
+            <span className="material-icons">{maximized ? 'filter_none' : 'crop_square'}</span>
           </button>
           <button className="window-control close" title="关闭" onClick={() => window.calendarApi.windowClose()}>
             <span className="material-icons">close</span>

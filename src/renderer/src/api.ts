@@ -10,6 +10,7 @@ interface CalendarApi {
   onAppToast: (callback: (message: string) => void) => () => void
   windowMinimize: () => void
   windowToggleMaximize: () => void
+  windowIsMaximized: () => Promise<boolean>
   windowClose: () => void
   openDataDir: () => Promise<string>
   backupData: () => Promise<string | null>

@@ -15,6 +15,8 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const [newDue, setNewDue] = useState(today)
   const [newReminder, setNewReminder] = useState('')
   const [showDone, setShowDone] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [query, setQuery] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [editDue, setEditDue] = useState('')
@@ -65,6 +67,9 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
 
   const open = tasks.filter((t) => t.status === 'needsAction')
   const done = tasks.filter((t) => t.status === 'completed')
+  const matches = (task: TaskInfo) => !query.trim() || `${task.title} ${task.notes ?? ''}`.toLowerCase().includes(query.trim().toLowerCase())
+  const visibleOpen = open.filter(matches)
+  const visibleDone = done.filter(matches)
   const todayStr = DateTime.now().toISODate()
 
   const renderTask = (t: TaskInfo) => {
@@ -139,12 +144,18 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
           <span className="material-icons">close</span>
         </button>
         <span className="tasks-title">任务</span>
-        <button className="icon-btn" title="更多">
+        <button className="icon-btn" title="更多" onClick={() => setMoreOpen((value) => !value)}>
           <span className="material-icons">more_vert</span>
         </button>
+        {moreOpen && (
+          <div className="tasks-more-menu">
+            <button onClick={() => { void Promise.all(done.map((task) => api.deleteTask(task.id))).then(() => { onToast('已清除已完成任务'); setMoreOpen(false); return load() }) }}>清除已完成任务</button>
+          </div>
+        )}
       </div>
 
       <div className="tasks-list">
+        <input className="task-search" placeholder="搜索任务" value={query} onChange={(event) => setQuery(event.target.value)} />
         {adding ? (
           <div className="task-add-form">
             <span className="task-add-check" />
@@ -198,15 +209,15 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
           </button>
         )}
 
-        {open.map(renderTask)}
+        {visibleOpen.map(renderTask)}
 
-        {done.length > 0 && (
+        {visibleDone.length > 0 && (
           <>
             <button className="tasks-done-toggle" onClick={() => setShowDone((v) => !v)}>
               <span className="material-icons">{showDone ? 'expand_less' : 'expand_more'}</span>
               已完成的任务
             </button>
-            {showDone && done.map(renderTask)}
+            {showDone && visibleDone.map(renderTask)}
           </>
         )}
       </div>

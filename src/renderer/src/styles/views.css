@@ -699,11 +699,64 @@
 .dlg-mask {
   position: fixed;
   inset: 0;
-  background: rgba(60, 64, 67, 0.3);
+  background: rgba(18, 39, 71, 0.2);
+  backdrop-filter: blur(2px);
   z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.help-dialog {
+  width: min(680px, calc(100vw - 32px));
+  max-height: min(760px, calc(100vh - 48px));
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(22, 48, 86, 0.28);
+  padding: 22px 26px 16px;
+  animation: dialog-enter 0.18s ease-out;
+}
+
+.help-section {
+  padding: 16px 0;
+  border-top: 1px solid var(--divider);
+}
+
+.help-section p {
+  margin: 8px 0;
+  color: var(--text-2);
+  line-height: 1.55;
+  user-select: text;
+}
+
+.help-code-wrap {
+  position: relative;
+  margin: 12px 0;
+  padding: 14px 14px 8px;
+  border-radius: 10px;
+  background: #0b1c3a;
+}
+
+.help-code {
+  overflow-x: auto;
+  color: #d8e7ff;
+  font: 13px/1.65 Consolas, 'Courier New', monospace;
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+.help-code-wrap .btn-text {
+  margin-top: 6px;
+  color: #9fc4ff;
+}
+
+:root[data-theme='dark'] .help-dialog {
+  background: #10294f;
+}
+
+:root[data-theme='dark'] .tasks-more-menu {
+  background: #10294f;
 }
 
 .dlg {
@@ -970,11 +1023,46 @@
 }
 
 .tasks-head {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 4px 8px;
   flex-shrink: 0;
+}
+
+.tasks-more-menu {
+  position: absolute;
+  top: 48px;
+  right: 8px;
+  z-index: 20;
+  min-width: 150px;
+  padding: 6px 0;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(22, 48, 86, 0.2);
+}
+
+.tasks-more-menu button {
+  width: 100%;
+  padding: 9px 14px;
+  text-align: left;
+  color: var(--text-2);
+}
+
+.tasks-more-menu button:hover {
+  background: var(--hover);
+}
+
+.task-search {
+  width: calc(100% - 32px);
+  height: 34px;
+  margin: 4px 16px 8px;
+  padding: 0 10px;
+  border: 1px solid var(--divider);
+  border-radius: 17px;
+  color: var(--text-1);
+  background: transparent;
 }
 
 .tasks-head .tasks-title {

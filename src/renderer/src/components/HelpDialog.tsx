@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { CalendarInfo } from '../api'
 
 interface HelpDialogProps {
@@ -6,6 +7,8 @@ interface HelpDialogProps {
 }
 
 export default function HelpDialog({ calendars, onClose }: HelpDialogProps) {
+  const [copied, setCopied] = useState(false)
+  const aiExample = 'localcal today\nlocalcal next\nlocalcal create "项目评审" -s 2026-09-01T10:00 -e 2026-09-01T11:00 --remind 30\nlocalcal task add "交周报" -d 2026-09-04 --remind 60\nlocalcal list --json'
   return (
     <div className="dlg-mask" onMouseDown={onClose}>
       <div className="help-dialog" onMouseDown={(event) => event.stopPropagation()}>
@@ -25,7 +28,7 @@ export default function HelpDialog({ calendars, onClose }: HelpDialogProps) {
         <section className="help-section">
           <div className="settings-section-title">AI / CLI</div>
           <p>AI 可以通过 `localcal` 命令直接操作本地数据，不需要登录或云端服务。</p>
-          <div className="help-code">localcal today{`\n`}localcal next{`\n`}localcal create "项目评审" -s 2026-09-01T10:00 -e 2026-09-01T11:00 --remind 30{`\n`}localcal task add "交周报" -d 2026-09-04 --remind 60{`\n`}localcal list --json</div>
+          <div className="help-code-wrap"><pre className="help-code">{aiExample}</pre><button className="btn-text compact" onClick={() => { void navigator.clipboard.writeText(aiExample).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }) }}>{copied ? '已复制' : '复制示例'}</button></div>
           <p>建议 AI 使用 `--json` 获取稳定结构化结果；日历 ID 可先用 `localcal calendars` 查询。</p>
         </section>
         <section className="help-section">

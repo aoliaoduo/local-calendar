@@ -1,6 +1,6 @@
 {
   "name": "local-calendar",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Local Google Calendar clone with tasks, operable via CLI",
   "main": "out/main/index.js",
   "type": "module",
@@ -29,7 +29,7 @@
     "icon": "src/renderer/icon.ico",
     "asar": true,
     "directories": {
-      "output": "portable-v1.1.1"
+      "output": "portable-v1.2.0"
     },
     "files": [
       "out/**/*",

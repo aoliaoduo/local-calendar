@@ -164,6 +164,7 @@ function createWindow(): void {
     event.preventDefault()
     win.hide()
   })
+  win.on('system-context-menu', (event) => event.preventDefault())
   win.on('ready-to-show', () => {
     win.maximize()
     win.show()
@@ -374,6 +375,7 @@ app.whenReady().then(() => {
     if (win.isMaximized()) win.unmaximize()
     else win.maximize()
   })
+  ipcMain.handle('window-is-maximized', (event) => BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false)
   ipcMain.on('window-close', (event) => BrowserWindow.fromWebContents(event.sender)?.close())
   ipcMain.handle('open-data-dir', async () => {
     const dataDir = getDataDir()
