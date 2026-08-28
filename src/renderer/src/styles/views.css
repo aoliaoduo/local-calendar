@@ -1095,6 +1095,10 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  margin: 10px 10px 14px 0;
+  border: 1px solid var(--divider);
+  border-radius: 18px;
+  box-shadow: 0 2px 8px rgba(22, 48, 86, 0.12);
 }
 
 .tasks-head {

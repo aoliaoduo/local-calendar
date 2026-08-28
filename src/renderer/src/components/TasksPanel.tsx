@@ -143,7 +143,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
         <button className="icon-btn" title="关闭" onClick={onClose}>
           <span className="material-icons">close</span>
         </button>
-        <span className="tasks-title">任务</span>
+        <span className="tasks-title">我的任务</span>
         <button className="icon-btn" title="更多" onClick={() => setMoreOpen((value) => !value)}>
           <span className="material-icons">more_vert</span>
         </button>

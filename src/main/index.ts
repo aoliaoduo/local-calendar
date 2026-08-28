@@ -168,6 +168,8 @@ function createWindow(): void {
   win.on('ready-to-show', () => {
     win.maximize()
     win.show()
+    setTimeout(() => checkReminders(), 1500)
+    setTimeout(() => void runAutoBackup(), 5000)
   })
   if (process.env.ELECTRON_RENDERER_URL) {
     void win.loadURL(process.env.ELECTRON_RENDERER_URL)
@@ -443,9 +445,7 @@ app.whenReady().then(() => {
   createWindow()
   createTray()
   setInterval(() => tray?.setContextMenu(buildTrayMenu()), 60_000)
-  checkReminders()
   setInterval(checkReminders, 30_000)
-  void runAutoBackup()
   setInterval(() => void runAutoBackup(), 6 * 60 * 60 * 1000)
 
   app.on('activate', () => {
