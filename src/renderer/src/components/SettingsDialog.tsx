@@ -15,6 +15,7 @@ interface SettingsDialogProps {
   onBackup: () => Promise<string | null>
   onRestore: () => Promise<string | null>
   onImportIcs: () => Promise<number>
+  onOpenRecycleBin: () => void
   username: string
   avatarColor: string
   onProfileChange: (username: string, avatarColor: string) => void
@@ -36,6 +37,7 @@ export default function SettingsDialog({
   onBackup,
   onRestore,
   onImportIcs,
+  onOpenRecycleBin,
   username,
   avatarColor,
   onProfileChange,
@@ -225,6 +227,7 @@ export default function SettingsDialog({
             <button className="btn-text compact" disabled={busy} onClick={() => void backup()}>备份数据</button>
             <button className="btn-text compact" disabled={busy} onClick={() => void restore()}>恢复备份</button>
             <button className="btn-text compact" disabled={busy} onClick={() => void importIcs()}>导入 ICS</button>
+            <button className="btn-text compact" disabled={busy} onClick={onOpenRecycleBin}>回收站</button>
           </div>
           <button className="btn-text" onClick={onClose}>完成</button>
         </div>

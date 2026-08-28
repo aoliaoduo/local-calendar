@@ -120,7 +120,7 @@
 }
 
 :root[data-theme='dark'] .year-month {
-  background: #10294f;
+  background: #121a26;
 }
 
 /* ---------- 周视图 / 日视图 ---------- */
@@ -679,6 +679,52 @@
   text-align: center;
 }
 
+.recycle-dialog {
+  width: min(620px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(22, 48, 86, 0.28);
+  animation: dialog-enter 0.18s ease-out;
+}
+
+.recycle-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 18px;
+}
+
+.recycle-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.recycle-item > .material-icons {
+  font-size: 20px;
+  color: var(--text-3);
+}
+
+.recycle-item-body {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-1);
+}
+
+.recycle-item-body small {
+  color: var(--text-4);
+  font-size: 11px;
+}
+
+:root[data-theme='dark'] .recycle-dialog {
+  background: #121a26;
+}
+
 .day-agenda-foot {
   border-top: 1px solid var(--divider);
   justify-content: flex-end;
@@ -753,11 +799,11 @@
 }
 
 :root[data-theme='dark'] .help-dialog {
-  background: #10294f;
+  background: #121a26;
 }
 
 :root[data-theme='dark'] .tasks-more-menu {
-  background: #10294f;
+  background: #121a26;
 }
 
 .dlg {

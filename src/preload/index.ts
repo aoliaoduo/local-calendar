@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('calendarApi', {
   windowMinimize: () => ipcRenderer.send('window-minimize'),
   windowToggleMaximize: () => ipcRenderer.send('window-toggle-maximize'),
   windowIsMaximized: () => ipcRenderer.invoke('window-is-maximized') as Promise<boolean>,
+  printCalendar: () => ipcRenderer.invoke('print-calendar') as Promise<boolean>,
   onWindowStateChanged: (callback: (maximized: boolean) => void) => {
     const listener = (_event: unknown, maximized: boolean) => callback(maximized)
     ipcRenderer.on('window-state-changed', listener)

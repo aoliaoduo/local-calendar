@@ -11,6 +11,7 @@ import type {
   CreateTaskInput,
   Reminder,
   Task,
+  TrashItem,
   UpdateEventInput,
   UpdateTaskInput
 } from './types'
@@ -524,6 +525,9 @@ export class CalendarService {
   }
 
   deleteEvent(id: string): boolean {
+    const row = this.db.prepare('SELECT * FROM events WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    if (!row) return false
+    this.db.prepare('INSERT INTO trash (id, kind, title, payload, deleted_at) VALUES (?, ?, ?, ?, ?)').run(randomUUID(), 'event', row.title as string, JSON.stringify(row), nowIso())
     return this.db.prepare('DELETE FROM events WHERE id = ?').run(id).changes > 0
   }
 
@@ -599,7 +603,43 @@ export class CalendarService {
   }
 
   deleteTask(id: string): boolean {
+    const row = this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    if (!row) return false
+    this.db.prepare('INSERT INTO trash (id, kind, title, payload, deleted_at) VALUES (?, ?, ?, ?, ?)').run(randomUUID(), 'task', row.title as string, JSON.stringify(row), nowIso())
     return this.db.prepare('DELETE FROM tasks WHERE id = ?').run(id).changes > 0
+  }
+
+  listTrash(): TrashItem[] {
+    return (this.db.prepare('SELECT id, kind, title, deleted_at FROM trash ORDER BY deleted_at DESC').all() as Record<string, unknown>[]).map((row) => ({
+      id: row.id as string,
+      kind: row.kind as TrashItem['kind'],
+      title: row.title as string,
+      deletedAt: row.deleted_at as string
+    }))
+  }
+
+  restoreTrash(id: string): boolean {
+    const row = this.db.prepare('SELECT * FROM trash WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    if (!row) return false
+    const payload = JSON.parse(row.payload as string) as Record<string, unknown>
+    if (row.kind === 'event') {
+      const calendarId = this.getCalendar(payload.calendar_id as string) ? payload.calendar_id : 'personal'
+      this.db.prepare(
+        `INSERT OR REPLACE INTO events (id, calendar_id, title, description, location, start_utc, end_utc, is_all_day, color_override, rrule, exdates, status, reminders, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(payload.id, calendarId, payload.title, payload.description ?? null, payload.location ?? null, payload.start_utc, payload.end_utc, payload.is_all_day ?? 0, payload.color_override ?? null, payload.rrule ?? null, payload.exdates ?? '[]', payload.status ?? 'confirmed', payload.reminders ?? '[]', payload.created_at, payload.updated_at)
+    } else {
+      this.db.prepare(
+        `INSERT OR REPLACE INTO tasks (id, title, notes, due_at, reminder_minutes, completed_at, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(payload.id, payload.title, payload.notes ?? null, payload.due_at ?? null, payload.reminder_minutes ?? null, payload.completed_at ?? null, payload.status ?? 'needsAction', payload.created_at, payload.updated_at)
+    }
+    this.db.prepare('DELETE FROM trash WHERE id = ?').run(id)
+    return true
+  }
+
+  deleteTrash(id: string): boolean {
+    return this.db.prepare('DELETE FROM trash WHERE id = ?').run(id).changes > 0
   }
 
   // ---------- agenda ----------

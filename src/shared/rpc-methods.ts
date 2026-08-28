@@ -36,6 +36,9 @@ export function createMethodTable(svc: CalendarService): MethodTable {
   register('tasks.list', false, (p) => svc.listTasks(p.filter as never))
   register('tasks.update', true, (p) => svc.updateTask(p.id as string, p.patch as never))
   register('tasks.delete', true, (p) => svc.deleteTask(p.id as string))
+  register('trash.list', false, () => svc.listTrash())
+  register('trash.restore', true, (p) => svc.restoreTrash(p.id as string))
+  register('trash.delete', true, (p) => svc.deleteTrash(p.id as string))
   register('agenda.today', false, () => svc.getTodayAgenda())
 
   return { methods, mutating }

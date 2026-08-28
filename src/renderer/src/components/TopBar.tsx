@@ -22,6 +22,7 @@ interface TopBarProps {
   onToast: (message: string) => void
   onSettings: () => void
   onHelp: () => void
+  onPrint: () => void
   username: string
   avatarColor: string
   avatarImage: string | null
@@ -45,6 +46,7 @@ export default function TopBar({
   onToast,
   onSettings,
   onHelp,
+  onPrint,
   username,
   avatarColor,
   avatarImage
@@ -181,6 +183,9 @@ export default function TopBar({
         <button className="icon-btn" title="使用说明" onClick={onHelp}>
           <span className="material-icons">help_outline</span>
         </button>
+        <button className="icon-btn" title="打印" onClick={onPrint}>
+          <span className="material-icons">print</span>
+        </button>
         <button className="icon-btn" title="设置" onClick={onSettings}>
           <span className="material-icons">settings</span>
         </button>
@@ -213,22 +218,9 @@ export default function TopBar({
           )}
         </div>
 
-        <div className="seg-control">
-          <button
-            className={`seg-btn${!tasksOpen ? ' active' : ''}`}
-            title="日历视图"
-            onClick={() => tasksOpen && onToggleTasks()}
-          >
-            <span className="material-icons">calendar_month</span>
-          </button>
-          <button
-            className={`seg-btn${tasksOpen ? ' active' : ''}`}
-            title="任务"
-            onClick={onToggleTasks}
-          >
-            <span className="material-icons">check</span>
-          </button>
-        </div>
+        <button className={`icon-btn task-toggle${tasksOpen ? ' active' : ''}`} title={tasksOpen ? '隐藏任务' : '显示任务'} onClick={onToggleTasks}>
+          <span className="material-icons">check_circle</span>
+        </button>
 
         <button className="icon-btn" title="应用信息" onClick={() => onToast('本地日历 · 数据仅保存在此电脑。')}>
           <span className="material-icons">apps</span>

@@ -21,16 +21,16 @@
 }
 
 :root[data-theme='dark'] {
-  --surface: #081a38;
-  --text-1: #e8eaed;
-  --text-2: #dadce0;
-  --text-3: #bdc1c6;
-  --text-4: #9aa0a6;
-  --text-5: #80868b;
-  --divider: #294a78;
-  --grid-line: #17345d;
-  --hover: #102d57;
-  --blue-soft: #173f79;
+  --surface: #0b0f17;
+  --text-1: #f1f5fb;
+  --text-2: #d7e0ee;
+  --text-3: #aab8cb;
+  --text-4: #8290a4;
+  --text-5: #647287;
+  --divider: #263142;
+  --grid-line: #1a2432;
+  --hover: #141d2b;
+  --blue-soft: #172943;
 }
 
 * {
@@ -42,6 +42,14 @@
 ::-webkit-scrollbar-button {
   display: none;
   width: 0;
+  height: 0;
+}
+
+::-webkit-scrollbar-button:single-button:vertical:decrement,
+::-webkit-scrollbar-button:single-button:vertical:increment,
+::-webkit-scrollbar-button:vertical:start:decrement,
+::-webkit-scrollbar-button:vertical:end:increment {
+  display: none;
   height: 0;
 }
 
@@ -125,11 +133,11 @@ select {
 :root[data-theme='dark'] .search-panel,
 :root[data-theme='dark'] .view-menu,
 :root[data-theme='dark'] .tasks-panel {
-  background: #10294f;
+  background: #121a26;
 }
 
 :root[data-theme='dark'] .wk-evt {
-  background: color-mix(in srgb, var(--c) 30%, #10294f);
+  background: color-mix(in srgb, var(--c) 28%, #121a26);
 }
 
 :root[data-theme='dark'] .today-btn,
@@ -138,7 +146,7 @@ select {
 :root[data-theme='dark'] .settings-field select,
 :root[data-theme='dark'] .settings-create-calendar input,
 :root[data-theme='dark'] .settings-calendar-row input {
-  background: #10294f;
+  background: #121a26;
   color: var(--text-1);
 }
 
@@ -487,6 +495,11 @@ select {
   border-radius: 20px;
   overflow: hidden;
   margin: 0 8px 0 4px;
+}
+
+.task-toggle.active {
+  color: var(--g-blue);
+  background: var(--blue-soft);
 }
 
 .seg-btn {

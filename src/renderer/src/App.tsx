@@ -11,6 +11,7 @@ import TasksPanel from './components/TasksPanel'
 import SettingsDialog from './components/SettingsDialog'
 import DayAgendaDialog from './components/DayAgendaDialog'
 import HelpDialog from './components/HelpDialog'
+import RecycleBinDialog from './components/RecycleBinDialog'
 import { api, type CalendarInfo, type EventInfo, type TaskInfo } from './api'
 import { weekDates } from './dateUtils'
 
@@ -18,7 +19,7 @@ export default function App() {
   const [view, setView] = useState<ViewKind>(() => (localStorage.getItem('local-calendar.default-view') as ViewKind) || 'week')
   const [cursor, setCursor] = useState(() => DateTime.now())
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [tasksOpen, setTasksOpen] = useState(false)
+  const [tasksOpen, setTasksOpen] = useState(true)
   const [calendars, setCalendars] = useState<CalendarInfo[]>([])
   const [events, setEvents] = useState<EventInfo[]>([])
   const [tasks, setTasks] = useState<TaskInfo[]>([])
@@ -27,6 +28,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [agendaDay, setAgendaDay] = useState<DateTime | null>(null)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [recycleOpen, setRecycleOpen] = useState(false)
   const [username, setUsername] = useState(() => localStorage.getItem('local-calendar.username') || '本地用户')
   const [avatarColor, setAvatarColor] = useState(() => localStorage.getItem('local-calendar.avatar-color') || '#4285f4')
   const [avatarImage, setAvatarImage] = useState<string | null>(() => localStorage.getItem('local-calendar.avatar-image'))
@@ -265,6 +267,7 @@ export default function App() {
         onToast={setToast}
         onSettings={() => setSettingsOpen(true)}
         onHelp={() => setHelpOpen(true)}
+        onPrint={() => { void window.calendarApi.printCalendar().then((printed) => { if (!printed) setToast('打印已取消或失败') }) }}
         username={username}
         avatarColor={avatarColor}
         avatarImage={avatarImage}
@@ -347,6 +350,7 @@ export default function App() {
           onBackup={handleBackup}
           onRestore={handleRestore}
           onImportIcs={handleImportIcs}
+          onOpenRecycleBin={() => setRecycleOpen(true)}
           username={username}
           avatarColor={avatarColor}
           onProfileChange={updateProfile}
@@ -357,6 +361,7 @@ export default function App() {
       )}
 
       {helpOpen && <HelpDialog calendars={calendars} onClose={() => setHelpOpen(false)} />}
+      {recycleOpen && <RecycleBinDialog onClose={() => setRecycleOpen(false)} onToast={setToast} />}
 
       {agendaDay && (
         <DayAgendaDialog

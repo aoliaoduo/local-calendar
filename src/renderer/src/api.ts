@@ -11,6 +11,7 @@ interface CalendarApi {
   windowMinimize: () => void
   windowToggleMaximize: () => void
   windowIsMaximized: () => Promise<boolean>
+  printCalendar: () => Promise<boolean>
   onWindowStateChanged: (callback: (maximized: boolean) => void) => () => void
   windowClose: () => void
   openDataDir: () => Promise<string>
@@ -68,6 +69,13 @@ export interface TaskInfo {
   status: 'needsAction' | 'completed'
 }
 
+export interface TrashInfo {
+  id: string
+  kind: 'event' | 'task'
+  title: string
+  deletedAt: string
+}
+
 export const api = {
   listCalendars: () => rpc<CalendarInfo[]>('calendars.list'),
   createCalendar: (input: { name: string; color?: string }) => rpc<CalendarInfo>('calendars.create', input),
@@ -87,5 +95,8 @@ export const api = {
     rpc<TaskInfo[]>('tasks.list', { filter: { status } }),
   createTask: (input: { title: string; notes?: string; dueAt?: string; reminderMinutes?: number | null }) => rpc<TaskInfo>('tasks.create', input),
   updateTask: (id: string, patch: Record<string, unknown>) => rpc<TaskInfo | null>('tasks.update', { id, patch }),
-  deleteTask: (id: string) => rpc<boolean>('tasks.delete', { id })
+  deleteTask: (id: string) => rpc<boolean>('tasks.delete', { id }),
+  listTrash: () => rpc<TrashInfo[]>('trash.list'),
+  restoreTrash: (id: string) => rpc<boolean>('trash.restore', { id }),
+  deleteTrash: (id: string) => rpc<boolean>('trash.delete', { id })
 }

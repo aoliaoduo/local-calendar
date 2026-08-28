@@ -96,6 +96,13 @@ export interface UpdateTaskInput {
   completed?: boolean
 }
 
+export interface TrashItem {
+  id: string
+  kind: 'event' | 'task'
+  title: string
+  deletedAt: string
+}
+
 export interface RpcRequest {
   method: string
   params: Record<string, unknown>

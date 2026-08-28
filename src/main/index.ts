@@ -377,6 +377,11 @@ app.whenReady().then(() => {
     win.webContents.send('window-state-changed', win.isMaximized())
   })
   ipcMain.handle('window-is-maximized', (event) => BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false)
+  ipcMain.handle('print-calendar', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win) return false
+    return win.webContents.print({ silent: false, printBackground: true, margins: { marginType: 'default' } })
+  })
   ipcMain.on('window-close', (event) => BrowserWindow.fromWebContents(event.sender)?.close())
   ipcMain.handle('open-data-dir', async () => {
     const dataDir = getDataDir()

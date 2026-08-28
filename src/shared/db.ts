@@ -46,6 +46,14 @@ CREATE TABLE IF NOT EXISTS tasks (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS trash (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  title TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  deleted_at TEXT NOT NULL
+);
 `
 
 export function openDatabase(): DB {
