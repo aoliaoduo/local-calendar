@@ -17,6 +17,7 @@ const HELP = `本地日历 CLI — 操作 Local Calendar 的日程与待办
   today                               agenda 的快捷别名
   next                                查看下一条即将开始的日程
   export [-f 开始] [-t 结束] [-o 文件] 导出 ICS 日程文件
+  import -i 文件                       导入 ICS 日程文件
   list [-f 开始] [-t 结束] [-c 日历]   查询日程（默认今天起 7 天）
   create <标题> -s <开始> [-e <结束>]  创建日程
        [-c 日历] [--all-day] [-l 地点] [-n 说明]
@@ -111,9 +112,10 @@ const SHORT_TO_LONG: Record<string, string> = {
   f: 'from',
   t: 'to',
   r: 'repeat',
-  o: 'out'
+  o: 'out',
+  i: 'in'
 }
-const VALUE_FLAGS = new Set(['start', 'end', 'calendar', 'location', 'note', 'due', 'from', 'to', 'title', 'repeat', 'remind', 'out'])
+const VALUE_FLAGS = new Set(['start', 'end', 'calendar', 'location', 'note', 'due', 'from', 'to', 'title', 'repeat', 'remind', 'out', 'in'])
 const BOOL_FLAGS = new Set(['all-day', 'all', 'done', 'json'])
 
 const REPEAT_MAP: Record<string, string> = {
@@ -174,6 +176,73 @@ async function cmdExport(backend: Backend, flags: Record<string, string | true>,
   writeFileSync(output, `${lines.join('\r\n')}\r\n`, 'utf8')
   if (json) return emitJson({ path: output, count: events.length, from, to })
   console.log(`已导出 ${events.length} 条日程 → ${output}`)
+}
+
+function icsUnescape(value: string): string {
+  return value.replace(/\\n/gi, '\n').replace(/\\([\\;,])/g, '$1')
+}
+
+function parseIcsDate(value: string): { value: string; allDay: boolean } | null {
+  const clean = value.trim()
+  if (/^\d{8}$/.test(clean)) {
+    const date = DateTime.fromFormat(clean, 'yyyyMMdd')
+    return date.isValid ? { value: date.toFormat('yyyy-MM-dd'), allDay: true } : null
+  }
+  const date = DateTime.fromFormat(clean.replace(/Z$/, ''), "yyyyMMdd'T'HHmmss", { zone: clean.endsWith('Z') ? 'utc' : 'local' })
+  return date.isValid ? { value: date.toISO()!, allDay: false } : null
+}
+
+async function cmdImport(backend: Backend, flags: Record<string, string | true>, json: boolean): Promise<void> {
+  const input = str(flags, 'in')
+  if (!input) throw new CliError('缺少输入文件。用法: import -i calendar.ics')
+  let content: string
+  try {
+    content = readFileSync(input, 'utf8')
+  } catch {
+    throw new CliError(`无法读取 ICS 文件: ${input}`)
+  }
+  const unfolded: string[] = []
+  for (const line of content.split(/\r?\n/)) {
+    if (/^[ \t]/.test(line) && unfolded.length) unfolded[unfolded.length - 1] += line.slice(1)
+    else unfolded.push(line)
+  }
+  const imported: CalendarEvent[] = []
+  let fields: Record<string, string> | null = null
+  for (const line of unfolded) {
+    if (line === 'BEGIN:VEVENT') fields = {}
+    else if (line === 'END:VEVENT' && fields) {
+      const startRaw = fields.DTSTART
+      const endRaw = fields.DTEND
+      const start = startRaw ? parseIcsDate(startRaw) : null
+      const end = endRaw ? parseIcsDate(endRaw) : null
+      if (start && fields.SUMMARY) {
+        const allDay = start.allDay
+        const endValue = end
+          ? allDay
+            ? end.value
+            : end.value
+          : allDay
+            ? DateTime.fromISO(start.value).plus({ days: 1 }).toFormat('yyyy-MM-dd')
+            : DateTime.fromISO(start.value).plus({ hours: 1 }).toISO()!
+        const event = await backend.call<CalendarEvent>('events.create', {
+          title: icsUnescape(fields.SUMMARY),
+          description: fields.DESCRIPTION ? icsUnescape(fields.DESCRIPTION) : undefined,
+          location: fields.LOCATION ? icsUnescape(fields.LOCATION) : undefined,
+          start: start.value,
+          end: endValue,
+          isAllDay: allDay,
+          rrule: fields.RRULE || undefined
+        })
+        imported.push(event)
+      }
+      fields = null
+    } else if (fields) {
+      const separator = line.indexOf(':')
+      if (separator > 0) fields[line.slice(0, separator).split(';')[0].toUpperCase()] = line.slice(separator + 1)
+    }
+  }
+  if (json) return emitJson({ count: imported.length, events: imported })
+  console.log(`已导入 ${imported.length} 条日程`)
 }
 
 interface ParsedArgs {
@@ -512,6 +581,8 @@ async function main(): Promise<void> {
       return cmdNext(backend, json)
     case 'export':
       return cmdExport(backend, flags, json)
+    case 'import':
+      return cmdImport(backend, flags, json)
     case 'list':
       return cmdList(backend, flags, json)
     case 'create':

@@ -13,6 +13,7 @@ interface CalendarApi {
   windowClose: () => void
   openDataDir: () => Promise<string>
   backupData: () => Promise<string | null>
+  restoreData: () => Promise<string | null>
 }
 
 declare global {

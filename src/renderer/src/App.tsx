@@ -158,6 +158,12 @@ export default function App() {
     return path
   }
 
+  const handleRestore = async () => {
+    const path = await window.calendarApi.restoreData()
+    if (path) setToast('正在恢复数据并重启应用…')
+    return path
+  }
+
   return (
     <div className="app">
       <TopBar
@@ -247,6 +253,7 @@ export default function App() {
           onCalendarDelete={handleCalendarDelete}
           onOpenDataDir={handleOpenDataDir}
           onBackup={handleBackup}
+          onRestore={handleRestore}
           onClose={() => setSettingsOpen(false)}
         />
       )}

@@ -30,6 +30,7 @@ localcal update abc12345 -e 2026-08-29T18:00     # id 可只写前几位
 localcal delete abc12345
 localcal search 评审
 localcal export -f 2026-08-28 -t 2027-08-28 -o calendar.ics
+localcal import -i calendar.ics
 localcal task add "交周报" -d 2026-09-04
 localcal task update 1a2b3c4d --title "交周报（已确认）" -n "周五 18:00 前"
 localcal task list                               # 未完成待办（--all 全部 / --done 已完成）
@@ -54,6 +55,7 @@ localcal calendars                               # 列出日历
 - 周视图支持按住空白时间段拖选，松开后直接创建对应时长的日程（15 分钟吸附）
 - 待办：界面侧板 + CLI 增删改查
 - 设置：默认视图、浅色/深色主题、本地日历新增/改名/改色/删除
+- 数据：设置中心可打开便携数据目录、备份数据库和从备份恢复
 - CLI：日程/待办 CRUD、搜索、今日总览、--json 输出、ID 前缀匹配
 
 CLI 的 `--remind` 使用分钟数：`0` 为开始时提醒，`10` 为提前 10 分钟，多个提醒用逗号分隔；`localcal update <id> --remind none` 可清除提醒。

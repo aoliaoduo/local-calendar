@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { copyFileSync, readFileSync, rmSync } from 'node:fs'
 import { DateTime } from 'luxon'
 import type { DB } from './db'
 import { getHolidays, HOLIDAY_CALENDAR_ID } from './lunar'
@@ -210,6 +211,15 @@ export class CalendarService {
 
   async backupTo(destination: string): Promise<void> {
     await this.db.backup(destination)
+  }
+
+  restoreFrom(source: string, destination: string): void {
+    const header = readFileSync(source).subarray(0, 16).toString('utf8')
+    if (header !== 'SQLite format 3\u0000') throw new Error('备份文件不是有效的 SQLite 数据库')
+    this.db.close()
+    copyFileSync(source, destination)
+    rmSync(`${destination}-wal`, { force: true })
+    rmSync(`${destination}-shm`, { force: true })
   }
 
   // ---------- calendars ----------

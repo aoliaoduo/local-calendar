@@ -17,5 +17,6 @@ contextBridge.exposeInMainWorld('calendarApi', {
   windowToggleMaximize: () => ipcRenderer.send('window-toggle-maximize'),
   windowClose: () => ipcRenderer.send('window-close'),
   openDataDir: () => ipcRenderer.invoke('open-data-dir') as Promise<string>,
-  backupData: () => ipcRenderer.invoke('backup-data') as Promise<string | null>
+  backupData: () => ipcRenderer.invoke('backup-data') as Promise<string | null>,
+  restoreData: () => ipcRenderer.invoke('restore-data') as Promise<string | null>
 })

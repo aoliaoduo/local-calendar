@@ -6,7 +6,7 @@ import { DateTime } from 'luxon'
 import { openDatabase } from '../shared/db'
 import { CalendarService } from '../shared/service'
 import { createMethodTable } from '../shared/rpc-methods'
-import { getRpcInfoPath, getDataDir } from '../shared/paths'
+import { getDbPath, getRpcInfoPath, getDataDir } from '../shared/paths'
 import { existsSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
 
 function configurePortableStorage(): void {
@@ -252,6 +252,19 @@ app.whenReady().then(() => {
     if (result.canceled || !result.filePath) return null
     await svc.backupTo(result.filePath)
     return result.filePath
+  })
+  ipcMain.handle('restore-data', async () => {
+    const result = await dialog.showOpenDialog({
+      title: '从备份恢复本地日历',
+      properties: ['openFile'],
+      filters: [{ name: 'SQLite 数据库', extensions: ['db'] }]
+    })
+    if (result.canceled || !result.filePaths[0]) return null
+    svc.restoreFrom(result.filePaths[0], getDbPath())
+    isQuitting = true
+    app.relaunch()
+    app.exit(0)
+    return result.filePaths[0]
   })
 
   startRpcServer(() => BrowserWindow.getAllWindows())

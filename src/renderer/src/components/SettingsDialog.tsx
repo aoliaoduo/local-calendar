@@ -13,6 +13,7 @@ interface SettingsDialogProps {
   onCalendarDelete: (id: string) => Promise<void>
   onOpenDataDir: () => Promise<string>
   onBackup: () => Promise<string | null>
+  onRestore: () => Promise<string | null>
   onClose: () => void
 }
 
@@ -27,6 +28,7 @@ export default function SettingsDialog({
   onCalendarDelete,
   onOpenDataDir,
   onBackup,
+  onRestore,
   onClose
 }: SettingsDialogProps) {
   const [newName, setNewName] = useState('')
@@ -75,6 +77,17 @@ export default function SettingsDialog({
     } catch (err) {
       setError(err instanceof Error ? err.message : '备份失败')
     } finally {
+      setBusy(false)
+    }
+  }
+
+  const restore = async () => {
+    if (!window.confirm('恢复备份会覆盖当前日历数据，应用将自动重启。确定继续吗？')) return
+    setBusy(true)
+    try {
+      await onRestore()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '恢复失败')
       setBusy(false)
     }
   }
@@ -158,6 +171,7 @@ export default function SettingsDialog({
           <div className="settings-foot-actions">
             <button className="btn-text compact" disabled={busy} onClick={() => void openDataDir()}>打开数据目录</button>
             <button className="btn-text compact" disabled={busy} onClick={() => void backup()}>备份数据</button>
+            <button className="btn-text compact" disabled={busy} onClick={() => void restore()}>恢复备份</button>
           </div>
           <button className="btn-text" onClick={onClose}>完成</button>
         </div>
