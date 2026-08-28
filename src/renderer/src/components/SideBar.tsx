@@ -40,7 +40,7 @@ export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, o
         <span className="cal-check">{cal.isVisible && <span className="material-icons">check</span>}</span>
         <span className="cal-name">{cal.name}</span>
       </button>
-      {cal.id !== 'personal' && <>
+      {cal.id !== 'personal' && cal.id !== 'holidays' && <>
         <button className="cal-row-more" title="日历选项" onClick={(event) => { event.stopPropagation(); setCalendarMenuId((id) => id === cal.id ? null : cal.id) }}><span className="material-icons">more_vert</span></button>
         {calendarMenuId === cal.id && <div className="cal-row-menu">
           <button onClick={() => { setCalendarMenuId(null); onEditCalendar(cal) }}>编辑日历</button>

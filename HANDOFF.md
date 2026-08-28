@@ -2,7 +2,7 @@
 
 ## Current Release
 
-The current source and public repository use semantic version `1.8.0`.
+The current source and public repository use semantic version `1.9.0`.
 
 Repository: https://github.com/aoliaoduo/local-calendar
 
@@ -15,6 +15,7 @@ Repository: https://github.com/aoliaoduo/local-calendar
 - Portable Windows packaging with app-local data.
 - Top-level settings menu follows the Google Calendar pattern: settings, recycle bin, appearance, and print.
 - Avatar opens a local profile card; appearance and calendar editing are separate from general settings.
+- PowerShell CLI is exposed through the package `bin/localcal.cmd` shim.
 
 ## Next Recommended Work
 

@@ -5,7 +5,7 @@
   "main": "out/main/index.js",
   "type": "module",
   "bin": {
-    "localcal": "out/main/cli.js"
+    "localcal": "bin/localcal.cmd"
   },
   "scripts": {
     "dev": "electron-vite dev",
