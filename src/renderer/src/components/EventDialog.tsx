@@ -16,7 +16,7 @@ export const EVENT_PALETTE = [
 ]
 
 export type DialogState =
-  | { mode: 'create'; day: DateTime; hour?: number; allDay?: boolean }
+  | { mode: 'create'; day: DateTime; hour?: number; allDay?: boolean; start?: DateTime; end?: DateTime }
   | { mode: 'edit'; event: EventInfo }
   | null
 
@@ -79,11 +79,11 @@ export default function EventDialog({ state, calendars, onClose, onSaved }: Even
   const initStart = existing
     ? DateTime.fromISO(existing.startUtc)
     : state?.mode === 'create'
-      ? state.day.startOf('day').plus({ hours: state.hour ?? Math.min(23, DateTime.now().hour + 1) })
+      ? state.start ?? state.day.startOf('day').plus({ hours: state.hour ?? Math.min(23, DateTime.now().hour + 1) })
       : DateTime.now()
   const initEnd = existing
     ? DateTime.fromISO(existing.endUtc)
-    : initStart.plus({ hours: 1 })
+    : state?.mode === 'create' && state.end ? state.end : initStart.plus({ hours: 1 })
   const initAllDay = existing ? existing.isAllDay : (state?.mode === 'create' ? !!state.allDay : false)
 
   const [title, setTitle] = useState(existing?.title ?? '')

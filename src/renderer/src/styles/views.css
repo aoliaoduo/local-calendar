@@ -162,6 +162,18 @@
   pointer-events: none;
 }
 
+.wk-select-preview {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  min-height: 8px;
+  border-radius: 4px;
+  background: rgba(26, 115, 232, 0.18);
+  border: 1px solid rgba(26, 115, 232, 0.55);
+  pointer-events: none;
+  z-index: 1;
+}
+
 .wk-now {
   position: absolute;
   height: 2px;

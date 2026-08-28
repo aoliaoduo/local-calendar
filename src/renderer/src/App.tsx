@@ -219,6 +219,7 @@ export default function App() {
               setView('day')
             }}
             onEventMove={handleEventMove}
+            onRangeSelect={(start, end) => setDialog({ mode: 'create', day: start.startOf('day'), start, end })}
           />
         )}
       </main>

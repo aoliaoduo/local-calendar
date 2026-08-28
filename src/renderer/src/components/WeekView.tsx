@@ -12,6 +12,7 @@ interface WeekViewProps {
   onSlotClick: (day: DateTime, hour: number) => void
   onDayNumClick: (day: DateTime) => void
   onEventMove: (id: string, start: DateTime, end: DateTime) => void
+  onRangeSelect: (start: DateTime, end: DateTime) => void
 }
 
 const HOUR_PX = 48
@@ -95,7 +96,8 @@ export default function WeekView({
   onEventClick,
   onSlotClick,
   onDayNumClick,
-  onEventMove
+  onEventMove,
+  onRangeSelect
 }: WeekViewProps) {
   const [now, setNow] = useState(() => DateTime.now())
   const [drag, setDrag] = useState<DragState | null>(null)
@@ -104,6 +106,7 @@ export default function WeekView({
   const alldayRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<DragState | null>(null)
   const suppressClick = useRef(false)
+  const [selection, setSelection] = useState<{ fromIdx: number; fromMin: number; toIdx: number; toMin: number } | null>(null)
 
   useEffect(() => {
     const t = setInterval(() => setNow(DateTime.now()), 60_000)
@@ -252,6 +255,59 @@ export default function WeekView({
     window.addEventListener('pointerup', onUp)
   }
 
+  function beginSelect(e: React.PointerEvent, dayIdx: number) {
+    if (e.button !== 0 || e.target !== e.currentTarget || drag) return
+    const colsEl = colsRef.current
+    if (!colsEl) return
+    const rects = childRects(colsEl)
+    const rect = rects[dayIdx]
+    if (!rect) return
+    const startMin = clamp(snap(((e.clientY - rect.top) / HOUR_PX) * 60), 0, 24 * 60 - SNAP_MIN)
+    const startX = e.clientX
+    const startY = e.clientY
+    let active = false
+    let current = { idx: dayIdx, min: startMin }
+    suppressClick.current = false
+
+    const updateSelection = (point: { idx: number; min: number }) => {
+      const startPoint = dayIdx < point.idx || (dayIdx === point.idx && startMin <= point.min)
+        ? { idx: dayIdx, min: startMin }
+        : point
+      const endPoint = startPoint.idx === dayIdx && startPoint.min === startMin ? point : { idx: dayIdx, min: startMin }
+      setSelection({ fromIdx: startPoint.idx, fromMin: startPoint.min, toIdx: endPoint.idx, toMin: endPoint.min })
+    }
+
+    const onMove = (event: PointerEvent) => {
+      if (!active) {
+        if (Math.hypot(event.clientX - startX, event.clientY - startY) < 4) return
+        active = true
+        suppressClick.current = true
+      }
+      const idx = clamp(indexFromX(event.clientX, rects), 0, cols - 1)
+      const targetRect = rects[idx]
+      current = { idx, min: clamp(snap(((event.clientY - targetRect.top) / HOUR_PX) * 60), 0, 24 * 60 - SNAP_MIN) }
+      updateSelection(current)
+    }
+
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      setSelection(null)
+      if (!active) return
+      const first = dayIdx < current.idx || (dayIdx === current.idx && startMin <= current.min)
+        ? { idx: dayIdx, min: startMin }
+        : current
+      const last = first.idx === dayIdx && first.min === startMin ? current : { idx: dayIdx, min: startMin }
+      const start = dates[first.idx].startOf('day').plus({ minutes: first.min })
+      let end = dates[last.idx].startOf('day').plus({ minutes: last.min })
+      if (end <= start) end = start.plus({ minutes: SNAP_MIN })
+      onRangeSelect(start, end)
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
+
   const hourLabels = Array.from({ length: 25 }, (_, h) => h)
   const hasAllday = dates.some((d) => (evtsByDay.get(d.toISODate()!)?.allday.length ?? 0) > 0)
   const nowTop = (now.hour * 60 + now.minute) / 60 * HOUR_PX
@@ -358,6 +414,7 @@ export default function WeekView({
                 <div
                   className="wk-col"
                   key={d.toISODate()}
+                  onPointerDown={(event) => beginSelect(event, dayIdx)}
                   onClick={(e) => {
                     if (e.target !== e.currentTarget) return
                     if (suppressClick.current) {
@@ -424,6 +481,15 @@ export default function WeekView({
                       </div>
                     )
                   })}
+                  {selection && dayIdx >= selection.fromIdx && dayIdx <= selection.toIdx && (
+                    <div
+                      className="wk-select-preview"
+                      style={{
+                        top: `${(dayIdx === selection.fromIdx ? selection.fromMin : 0) / 60 * HOUR_PX}px`,
+                        height: `${((dayIdx === selection.toIdx ? selection.toMin : 24 * 60) - (dayIdx === selection.fromIdx ? selection.fromMin : 0)) / 60 * HOUR_PX}px`
+                      }}
+                    />
+                  )}
                   {drag && drag.kind !== 'allday' && drag.dayIdx === dayIdx && (
                     <div
                       className="wk-evt ghost"
