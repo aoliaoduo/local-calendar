@@ -165,7 +165,7 @@ export default function TopBar({
         >
           <span className="material-icons">search</span>
         </button>
-        <button className="icon-btn" title="使用说明" onClick={() => onToast('快捷键：T 回到今天；1/2/3 切换日/周/月视图。')}>
+        <button className="icon-btn" title="使用说明" onClick={() => onToast('使用左侧创建按钮添加日程，点击日程即可编辑。')}>
           <span className="material-icons">help_outline</span>
         </button>
         <button className="icon-btn" title="设置" onClick={onSettings}>

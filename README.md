@@ -56,9 +56,3 @@ localcal calendars                               # 列出日历
 - CLI：日程/待办 CRUD、搜索、今日总览、--json 输出、ID 前缀匹配
 
 CLI 的 `--remind` 使用分钟数：`0` 为开始时提醒，`10` 为提前 10 分钟，多个提醒用逗号分隔；`localcal update <id> --remind none` 可清除提醒。
-
-## 快捷键
-
-- `T` 今天
-- `1` / `2` / `3` 日 / 周 / 月视图
-- `←` / `→` 上一页 / 下一页

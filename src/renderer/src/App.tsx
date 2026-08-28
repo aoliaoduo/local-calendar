@@ -99,20 +99,6 @@ export default function App() {
     else setCursor(cursor.plus({ months: dir }))
   }
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (dialog || (e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'TEXTAREA') return
-      if (e.key === 't' || e.key === 'T') setCursor(DateTime.now())
-      else if (e.key === '1') setView('day')
-      else if (e.key === '2') setView('week')
-      else if (e.key === '3') setView('month')
-      else if (e.key === 'ArrowLeft') step(-1)
-      else if (e.key === 'ArrowRight') step(1)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [cursor, view, dialog])
-
   const handleToggleCalendar = async (id: string, visible: boolean) => {
     try {
       await api.updateCalendar(id, { isVisible: visible })
