@@ -29,6 +29,7 @@ export default function App() {
   const [helpOpen, setHelpOpen] = useState(false)
   const [username, setUsername] = useState(() => localStorage.getItem('local-calendar.username') || '本地用户')
   const [avatarColor, setAvatarColor] = useState(() => localStorage.getItem('local-calendar.avatar-color') || '#4285f4')
+  const [avatarImage, setAvatarImage] = useState<string | null>(() => localStorage.getItem('local-calendar.avatar-image'))
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('local-calendar.theme') as 'light' | 'dark') || 'light')
 
   const loadCalendars = useCallback(async () => {
@@ -96,6 +97,12 @@ export default function App() {
     setAvatarColor(nextAvatarColor)
     localStorage.setItem('local-calendar.username', nextUsername.trim() || '本地用户')
     localStorage.setItem('local-calendar.avatar-color', nextAvatarColor)
+  }
+
+  const updateAvatarImage = (image: string | null) => {
+    setAvatarImage(image)
+    if (image) localStorage.setItem('local-calendar.avatar-image', image)
+    else localStorage.removeItem('local-calendar.avatar-image')
   }
 
   const dates = useMemo(() => {
@@ -260,6 +267,7 @@ export default function App() {
         onHelp={() => setHelpOpen(true)}
         username={username}
         avatarColor={avatarColor}
+        avatarImage={avatarImage}
         onSearchPick={(evt) => {
           setCursor(DateTime.fromISO(evt.startUtc) as DateTime<true>)
           setView('day')
@@ -342,6 +350,8 @@ export default function App() {
           username={username}
           avatarColor={avatarColor}
           onProfileChange={updateProfile}
+          avatarImage={avatarImage}
+          onAvatarImageChange={updateAvatarImage}
           onClose={() => setSettingsOpen(false)}
         />
       )}
