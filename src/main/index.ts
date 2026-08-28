@@ -29,6 +29,11 @@ function getIconPath(): string {
 }
 
 configurePortableStorage()
+const hasSingleInstanceLock = app.requestSingleInstanceLock()
+if (!hasSingleInstanceLock) {
+  app.quit()
+  process.exit(0)
+}
 const svc = new CalendarService(openDatabase())
 const { methods, mutating } = createMethodTable(svc)
 
@@ -164,14 +169,35 @@ function createTray(): void {
     return
   }
   tray.setToolTip('本地日历')
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: '打开本地日历', click: () => BrowserWindow.getAllWindows()[0]?.show() },
-      { type: 'separator' },
-      { label: '退出', click: () => { isQuitting = true; app.quit() } }
-    ])
-  )
+  tray.setContextMenu(buildTrayMenu())
   tray.on('double-click', () => BrowserWindow.getAllWindows()[0]?.show())
+}
+
+function buildTrayMenu(): Menu {
+  const today = DateTime.now().toISODate()!
+  let eventItems: Electron.MenuItemConstructorOptions[] = []
+  let taskItems: Electron.MenuItemConstructorOptions[] = []
+  try {
+    eventItems = svc.listEvents(today, today).slice(0, 8).map((event) => ({
+      label: `${event.isAllDay ? '全天' : DateTime.fromISO(event.startUtc).toLocal().toFormat('HH:mm')}  ${event.title}`,
+      click: () => BrowserWindow.getAllWindows()[0]?.show()
+    }))
+    taskItems = svc.listTasks({ status: 'needsAction' }).slice(0, 8).map((task) => ({
+      label: task.dueAt ? `${task.title}（${DateTime.fromISO(task.dueAt).toLocal().toFormat('M月d日')}）` : task.title,
+      click: () => BrowserWindow.getAllWindows()[0]?.show()
+    }))
+  } catch {
+    eventItems = []
+    taskItems = []
+  }
+  return Menu.buildFromTemplate([
+    { label: '打开本地日历', click: () => BrowserWindow.getAllWindows()[0]?.show() },
+    { type: 'separator' },
+    { label: `今日安排（${eventItems.length}）`, submenu: eventItems.length ? eventItems : [{ label: '今天没有日程', enabled: false }] },
+    { label: `未完成任务（${taskItems.length}）`, submenu: taskItems.length ? taskItems : [{ label: '没有未完成任务', enabled: false }] },
+    { type: 'separator' },
+    { label: '退出', click: () => { isQuitting = true; app.quit() } }
+  ])
 }
 
 // ---------- 提醒调度：每 30 秒检查即将开始的日程 ----------
@@ -270,6 +296,7 @@ app.whenReady().then(() => {
   startRpcServer(() => BrowserWindow.getAllWindows())
   createWindow()
   createTray()
+  setInterval(() => tray?.setContextMenu(buildTrayMenu()), 60_000)
   checkReminders()
   setInterval(checkReminders, 30_000)
 
@@ -287,6 +314,14 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   isQuitting = true
+})
+
+app.on('second-instance', () => {
+  const win = BrowserWindow.getAllWindows()[0]
+  if (!win) return
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
 })
 
 app.on('will-quit', () => {
