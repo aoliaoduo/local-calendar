@@ -422,6 +422,7 @@ export default function App() {
             }}
             onEventMove={handleEventMove}
             onRangeSelect={(start, end) => setDialog({ mode: 'create', day: start.startOf('day'), start, end })}
+            onSlotDoubleClick={(day, hour) => setDialog({ mode: 'create', day, hour, detailed: true })}
           />
         )}
       </main>

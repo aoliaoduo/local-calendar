@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.1
+
+- Added a detailed wide editor for double-click timeline creation while preserving quick single-click creation.
+
 ## 2.1.0
 
 - Added recurring tasks with single-instance edit, delete, and skip support.

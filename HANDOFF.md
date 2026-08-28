@@ -2,7 +2,7 @@
 
 ## Current Release
 
-The current source and public repository use semantic version `2.1.0`.
+The current source and public repository use semantic version `2.1.1`.
 
 Repository: https://github.com/aoliaoduo/local-calendar
 
@@ -24,6 +24,7 @@ Repository: https://github.com/aoliaoduo/local-calendar
 - Reminder payloads are also retained in the renderer notification center with target metadata.
 - Tasks now carry numeric priority (-1/0/1) and the panel groups open tasks by due-date horizon.
 - Tasks have a persisted `sort_order`; the task panel can reorder open tasks by drag and drop.
+- Week timeline distinguishes quick single-click creation from a detailed double-click editor.
 - Task filters and multi-select bulk completion/deletion are available in the task panel.
 - CLI includes `localcal doctor --json` for data-path, database, RPC, and record-count diagnostics.
 - CLI task listing supports `--today`, `--overdue`, and `--scheduled` filters.

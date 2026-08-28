@@ -16,7 +16,7 @@ export const EVENT_PALETTE = [
 ]
 
 export type DialogState =
-  | { mode: 'create'; day: DateTime; hour?: number; allDay?: boolean; start?: DateTime; end?: DateTime }
+  | { mode: 'create'; day: DateTime; hour?: number; allDay?: boolean; start?: DateTime; end?: DateTime; detailed?: boolean }
   | { mode: 'edit'; event: EventInfo; occurrenceIndex?: number }
   | null
 
@@ -101,6 +101,7 @@ export default function EventDialog({ state, calendars, onClose, onSaved }: Even
   const [error, setError] = useState('')
 
   if (!state) return null
+  const detailed = state.mode === 'create' && state.detailed === true
 
   const buildTime = (value: string, ref: DateTime): string => {
     const dt = allDay ? DateTime.fromISO(value).startOf('day') : DateTime.fromISO(value)
@@ -175,7 +176,7 @@ export default function EventDialog({ state, calendars, onClose, onSaved }: Even
 
   return (
     <div className="dlg-mask" onMouseDown={onClose}>
-      <div className="dlg" onMouseDown={(e) => e.stopPropagation()}>
+      <div className={`dlg${detailed ? ' dlg-detailed' : ''}`} onMouseDown={(e) => e.stopPropagation()}>
         <input
           className="dlg-title"
           placeholder="添加标题"

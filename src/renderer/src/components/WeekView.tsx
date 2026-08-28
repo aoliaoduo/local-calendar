@@ -13,6 +13,7 @@ interface WeekViewProps {
   onDayNumClick: (day: DateTime) => void
   onEventMove: (id: string, start: DateTime, end: DateTime) => void
   onRangeSelect: (start: DateTime, end: DateTime) => void
+  onSlotDoubleClick: (day: DateTime, hour: number) => void
 }
 
 const HOUR_PX = 48
@@ -97,7 +98,8 @@ export default function WeekView({
   onSlotClick,
   onDayNumClick,
   onEventMove,
-  onRangeSelect
+  onRangeSelect,
+  onSlotDoubleClick
 }: WeekViewProps) {
   const [now, setNow] = useState(() => DateTime.now())
   const [drag, setDrag] = useState<DragState | null>(null)
@@ -107,6 +109,7 @@ export default function WeekView({
   const dragRef = useRef<DragState | null>(null)
   const suppressClick = useRef(false)
   const [selection, setSelection] = useState<{ fromIdx: number; fromMin: number; toIdx: number; toMin: number } | null>(null)
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const t = setInterval(() => setNow(DateTime.now()), 60_000)
@@ -426,7 +429,16 @@ export default function WeekView({
                     }
                     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
                     const y = e.clientY - rect.top
-                    onSlotClick(d, Math.max(0, Math.min(23, Math.floor(y / HOUR_PX))))
+                    const hour = Math.max(0, Math.min(23, Math.floor(y / HOUR_PX)))
+                    if (clickTimer.current) clearTimeout(clickTimer.current)
+                    if (e.detail === 1) clickTimer.current = setTimeout(() => onSlotClick(d, hour), 220)
+                  }}
+                  onDoubleClick={(e) => {
+                    if (e.target !== e.currentTarget) return
+                    if (clickTimer.current) clearTimeout(clickTimer.current)
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                    const y = e.clientY - rect.top
+                    onSlotDoubleClick(d, Math.max(0, Math.min(23, Math.floor(y / HOUR_PX))))
                   }}
                 >
                   {Array.from({ length: 24 }, (_, h) => (
