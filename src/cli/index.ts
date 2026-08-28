@@ -14,6 +14,8 @@ const HELP = `本地日历 CLI — 操作 Local Calendar 的日程与待办
 
 日程:
   agenda                              今日总览（日程 + 待办）
+  today                               agenda 的快捷别名
+  next                                查看下一条即将开始的日程
   list [-f 开始] [-t 结束] [-c 日历]   查询日程（默认今天起 7 天）
   create <标题> -s <开始> [-e <结束>]  创建日程
        [-c 日历] [--all-day] [-l 地点] [-n 说明]
@@ -266,6 +268,24 @@ async function cmdAgenda(backend: Backend, json: boolean): Promise<void> {
   console.log(lines.join('\n'))
 }
 
+async function cmdNext(backend: Backend, json: boolean): Promise<void> {
+  const now = DateTime.now()
+  const events = await backend.call<CalendarEvent[]>('events.list', {
+    from: now.toISO(),
+    to: now.plus({ days: 30 }).toISO()
+  })
+  const next = events
+    .filter((event) => DateTime.fromISO(event.startUtc).toMillis() > now.toMillis())
+    .sort((first, second) => first.startUtc.localeCompare(second.startUtc))[0] ?? null
+  if (json) return emitJson(next)
+  if (!next) {
+    console.log('未来 30 天没有即将开始的日程')
+    return
+  }
+  const names = await calNames(backend)
+  console.log(fmtEventLine(next, names.get(next.calendarId)))
+}
+
 async function cmdList(backend: Backend, flags: Record<string, string | true>, json: boolean): Promise<void> {
   const from = str(flags, 'from') ?? DateTime.now().toFormat('yyyy-MM-dd')
   const to = str(flags, 'to') ?? DateTime.now().plus({ days: 7 }).toFormat('yyyy-MM-dd')
@@ -449,6 +469,10 @@ async function main(): Promise<void> {
       return
     case 'agenda':
       return cmdAgenda(backend, json)
+    case 'today':
+      return cmdAgenda(backend, json)
+    case 'next':
+      return cmdNext(backend, json)
     case 'list':
       return cmdList(backend, flags, json)
     case 'create':
