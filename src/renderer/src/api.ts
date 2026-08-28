@@ -4,10 +4,16 @@ export interface RpcResult<T> {
   error?: string
 }
 
+export interface AppToastInfo {
+  message: string
+  kind?: 'event' | 'task'
+  id?: string
+}
+
 interface CalendarApi {
   call: (method: string, params: Record<string, unknown>) => Promise<RpcResult<unknown>>
   onDataChanged: (callback: (payload: { method: string }) => void) => () => void
-  onAppToast: (callback: (message: string) => void) => () => void
+  onAppToast: (callback: (payload: AppToastInfo | string) => void) => () => void
   windowMinimize: () => void
   windowToggleMaximize: () => void
   windowIsMaximized: () => Promise<boolean>
@@ -19,6 +25,8 @@ interface CalendarApi {
   restoreData: () => Promise<string | null>
   importIcs: () => Promise<number>
   chooseAvatar: () => Promise<string | null>
+  getNotificationSettings: () => Promise<{ notificationsEnabled: boolean }>
+  setNotificationSettings: (enabled: boolean) => Promise<{ notificationsEnabled: boolean }>
 }
 
 declare global {
@@ -66,6 +74,10 @@ export interface TaskInfo {
   notes: string | null
   dueAt: string | null
   reminderMinutes: number | null
+  priority: number
+  sortOrder: number
+  rrule: string | null
+  exdates: string[]
   status: 'needsAction' | 'completed'
 }
 
@@ -93,9 +105,15 @@ export const api = {
     rpc<boolean>('events.deleteOccurrence', { id, occurrenceIndex }),
   listTasks: (status: 'needsAction' | 'completed' | 'all' = 'needsAction') =>
     rpc<TaskInfo[]>('tasks.list', { filter: { status } }),
-  createTask: (input: { title: string; notes?: string; dueAt?: string; reminderMinutes?: number | null }) => rpc<TaskInfo>('tasks.create', input),
+  listTaskOccurrences: (from?: string, to?: string) => rpc<TaskInfo[]>('tasks.occurrences', { from, to }),
+  createTask: (input: { title: string; notes?: string; dueAt?: string; reminderMinutes?: number | null; rrule?: string | null; priority?: number }) => rpc<TaskInfo>('tasks.create', input),
   updateTask: (id: string, patch: Record<string, unknown>) => rpc<TaskInfo | null>('tasks.update', { id, patch }),
+  updateTaskOccurrence: (id: string, occurrenceIndex: number, patch: Record<string, unknown>) =>
+    rpc<TaskInfo>('tasks.updateOccurrence', { id, occurrenceIndex, patch }),
+  deleteTaskOccurrence: (id: string, occurrenceIndex: number) =>
+    rpc<boolean>('tasks.deleteOccurrence', { id, occurrenceIndex }),
   deleteTask: (id: string) => rpc<boolean>('tasks.delete', { id }),
+  reorderTasks: (ids: string[]) => rpc<boolean>('tasks.reorder', { ids }),
   listTrash: () => rpc<TrashInfo[]>('trash.list'),
   restoreTrash: (id: string) => rpc<boolean>('trash.restore', { id }),
   deleteTrash: (id: string) => rpc<boolean>('trash.delete', { id })

@@ -1,6 +1,5 @@
 import { dirname, join } from 'node:path'
-import { homedir } from 'node:os'
-import { mkdirSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 
 export const APP_DIR_NAME = 'local-calendar'
 
@@ -13,10 +12,15 @@ export function getDataDir(): string {
     ? explicitDir
     : portableDir
       ? join(portableDir, 'data')
-      : process.env.LOCAL_CALENDAR_CLI_LOCAL === '1'
-        ? localDir
-      : join(process.env.APPDATA || process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), APP_DIR_NAME)
+      : localDir
   mkdirSync(dir, { recursive: true })
+  const legacyDir = join(process.env.APPDATA || '', APP_DIR_NAME)
+  if (dir !== legacyDir && !existsSync(join(dir, 'calendar.db')) && existsSync(join(legacyDir, 'calendar.db'))) {
+    copyFileSync(join(legacyDir, 'calendar.db'), join(dir, 'calendar.db'))
+    for (const suffix of ['-wal', '-shm']) {
+      if (existsSync(join(legacyDir, `calendar.db${suffix}`))) copyFileSync(join(legacyDir, `calendar.db${suffix}`), join(dir, `calendar.db${suffix}`))
+    }
+  }
   return dir
 }
 

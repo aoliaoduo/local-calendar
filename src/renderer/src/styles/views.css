@@ -1275,6 +1275,10 @@
   animation: dialog-enter 0.18s ease-out;
 }
 
+:root[data-theme='dark'] .task-dialog {
+  background: #101722;
+}
+
 .task-dialog-title {
   width: 100%;
   height: 44px;
@@ -1373,6 +1377,46 @@
   margin: 0 12px;
 }
 
+.task-filters {
+  display: flex;
+  gap: 4px;
+  padding: 8px 16px 4px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.task-filters button {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 4px;
+  border-radius: 14px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.task-filters button:hover { background: var(--hover); }
+.task-filters button.active { background: var(--blue-soft); color: var(--g-blue-text); font-weight: 500; }
+
+.task-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  padding: 4px 12px 4px 20px;
+  background: var(--blue-soft);
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.task-bulk-bar > span { margin-right: auto; }
+
+.task-select {
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  accent-color: var(--g-blue);
+  flex-shrink: 0;
+}
+
 .task-add-form .task-add-check {
   position: absolute;
 }
@@ -1413,9 +1457,58 @@
   border-left: 3px solid transparent;
 }
 
+.task-drag-handle {
+  width: 14px;
+  margin-top: 3px;
+  color: var(--text-5);
+  cursor: grab;
+  font-size: 16px;
+  opacity: 0;
+}
+
+.task-item:hover .task-drag-handle,
+.task-item.dragging .task-drag-handle {
+  opacity: 1;
+}
+
+.task-item.dragging {
+  opacity: .55;
+  background: var(--blue-soft);
+}
+
+.task-group-label {
+  padding: 12px 20px 4px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.task-priority {
+  margin-right: 4px;
+  vertical-align: -3px;
+  font-size: 15px;
+}
+
+.task-priority.high { color: var(--g-red); }
+.task-priority.low { color: var(--text-4); }
+.task-priority.repeat { color: var(--g-blue); }
+
 .task-item:hover {
-  background: #f8fbfd;
+  background: var(--hover);
   border-left-color: var(--g-blue);
+}
+
+:root[data-theme='dark'] .tasks-panel,
+:root[data-theme='dark'] .task-dialog,
+:root[data-theme='dark'] .tasks-more-menu {
+  background: #101722;
+  color: var(--text-1);
+}
+
+:root[data-theme='dark'] .task-item:hover {
+  background: #172131;
 }
 
 .task-check {
@@ -1610,6 +1703,15 @@
 
 .tasks-done-toggle:hover {
   background: var(--hover);
+}
+
+:root[data-theme='dark'] .recycle-dialog,
+:root[data-theme='dark'] .help-dialog,
+:root[data-theme='dark'] .profile-dialog,
+:root[data-theme='dark'] .calendar-edit-dialog,
+:root[data-theme='dark'] .appearance-dialog {
+  background: #101722;
+  color: var(--text-1);
 }
 
 .tasks-done-toggle .material-icons {

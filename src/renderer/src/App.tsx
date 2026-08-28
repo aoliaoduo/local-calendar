@@ -16,7 +16,7 @@ import AppearanceDialog from './components/AppearanceDialog'
 import ProfileDialog from './components/ProfileDialog'
 import CalendarEditDialog from './components/CalendarEditDialog'
 import TaskDialog from './components/TaskDialog'
-import { api, type CalendarInfo, type EventInfo, type TaskInfo } from './api'
+import { api, type AppToastInfo, type CalendarInfo, type EventInfo, type TaskInfo } from './api'
 import { weekDates } from './dateUtils'
 
 export default function App() {
@@ -27,8 +27,10 @@ export default function App() {
   const [calendars, setCalendars] = useState<CalendarInfo[]>([])
   const [events, setEvents] = useState<EventInfo[]>([])
   const [tasks, setTasks] = useState<TaskInfo[]>([])
+  const [taskOccurrences, setTaskOccurrences] = useState<TaskInfo[]>([])
   const [dialog, setDialog] = useState<DialogState>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [notifications, setNotifications] = useState<AppToastInfo[]>([])
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [agendaDay, setAgendaDay] = useState<DateTime | null>(null)
   const [helpOpen, setHelpOpen] = useState(false)
@@ -37,10 +39,13 @@ export default function App() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [calendarToEdit, setCalendarToEdit] = useState<CalendarInfo | null>(null)
   const [taskToEdit, setTaskToEdit] = useState<TaskInfo | null>(null)
+  const [taskOccurrenceIndex, setTaskOccurrenceIndex] = useState<number | undefined>(undefined)
+  const [taskOccurrenceDue, setTaskOccurrenceDue] = useState<string | undefined>(undefined)
   const [username, setUsername] = useState(() => localStorage.getItem('local-calendar.username') || '本地用户')
   const [avatarColor, setAvatarColor] = useState(() => localStorage.getItem('local-calendar.avatar-color') || '#4285f4')
   const [avatarImage, setAvatarImage] = useState<string | null>(() => localStorage.getItem('local-calendar.avatar-image'))
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('local-calendar.theme') as 'light' | 'dark') || 'light')
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true)
 
   const loadCalendars = useCallback(async () => {
     setCalendars(await api.listCalendars())
@@ -56,9 +61,19 @@ export default function App() {
     setTasks(await api.listTasks('all'))
   }, [])
 
+  const loadTaskOccurrences = useCallback(async () => {
+    const from = (view === 'year' ? cursor.startOf('year') : cursor.startOf('month').minus({ months: 2 })).toFormat('yyyy-MM-dd')
+    const to = (view === 'year' ? cursor.endOf('year') : cursor.endOf('month').plus({ months: 2 })).toFormat('yyyy-MM-dd')
+    setTaskOccurrences(await api.listTaskOccurrences(from, to))
+  }, [cursor, view])
+
   useEffect(() => {
     void loadCalendars()
   }, [loadCalendars])
+
+  useEffect(() => {
+    void window.calendarApi.getNotificationSettings().then((settings) => setNotificationsEnabled(settings.notificationsEnabled)).catch(() => {})
+  }, [])
 
   useEffect(() => {
     void loadEvents()
@@ -69,22 +84,76 @@ export default function App() {
   }, [loadTasks])
 
   useEffect(() => {
-    const w = window as unknown as { __setView?: (v: ViewKind) => void; __openCreate?: () => void; __openTasks?: () => void }
+    void loadTaskOccurrences()
+  }, [loadTaskOccurrences])
+
+  useEffect(() => {
+    const w = window as unknown as { __setView?: (v: ViewKind) => void; __openCreate?: () => void; __openTasks?: () => void; __openTarget?: (kind: 'event' | 'task', id: string) => void }
     w.__setView = setView
     w.__openCreate = () => setDialog({ mode: 'create', day: DateTime.now(), hour: Math.min(23, DateTime.now().hour + 1) })
     w.__openTasks = () => setTasksOpen(true)
-  }, [])
+    w.__openTarget = (kind, id) => {
+      const baseId = id.replace(/#\d+$/, '')
+      if (kind === 'task') {
+        const task = tasks.find((item) => item.id === baseId)
+        if (task) {
+          const occurrenceMatch = id.match(/#(\d+)$/)
+          const occurrenceIndex = occurrenceMatch ? Number(occurrenceMatch[1]) : undefined
+          if (occurrenceIndex === undefined) {
+            setCursor(task.dueAt ? DateTime.fromISO(task.dueAt) as DateTime<true> : DateTime.now())
+            setView('day')
+            setTaskOccurrenceIndex(undefined)
+            setTaskOccurrenceDue(undefined)
+            setTaskToEdit(task)
+          } else {
+            const from = task.dueAt ? DateTime.fromISO(task.dueAt).minus({ days: 1 }).toFormat('yyyy-MM-dd') : DateTime.now().toFormat('yyyy-MM-dd')
+            const to = task.dueAt ? DateTime.fromISO(task.dueAt).plus({ years: 3 }).toFormat('yyyy-MM-dd') : DateTime.now().plus({ years: 1 }).toFormat('yyyy-MM-dd')
+            void api.listTaskOccurrences(from, to).then((occurrences) => {
+              const occurrence = occurrences.find((item) => item.id === id)
+              const due = occurrence?.dueAt ?? task.dueAt
+              setCursor(due ? DateTime.fromISO(due) as DateTime<true> : DateTime.now())
+              setView('day')
+              setTaskOccurrenceIndex(occurrenceIndex)
+              setTaskOccurrenceDue(due ?? undefined)
+              setTaskToEdit(task)
+            }).catch(() => {})
+          }
+        }
+      } else {
+        const open = (event: EventInfo) => {
+          setCursor(DateTime.fromISO(event.startUtc) as DateTime<true>)
+          setView('day')
+          openEvent(event)
+        }
+        const event = events.find((item) => item.id === id || item.id === baseId)
+        if (event) open(event)
+        else {
+          const from = DateTime.now().minus({ years: 1 }).toFormat('yyyy-MM-dd')
+          const to = DateTime.now().plus({ years: 1 }).toFormat('yyyy-MM-dd')
+          void api.listEvents(from, to).then((found) => {
+            const match = found.find((item) => item.id === id || item.id === baseId)
+            if (match) open(match)
+          }).catch(() => {})
+        }
+      }
+    }
+  }, [events, tasks])
 
   useEffect(() => {
     const off = window.calendarApi.onDataChanged(() => {
       void loadCalendars()
       void loadEvents()
       void loadTasks()
+      void loadTaskOccurrences()
     })
     return off
-  }, [loadCalendars, loadEvents, loadTasks])
+  }, [loadCalendars, loadEvents, loadTasks, loadTaskOccurrences])
 
-  useEffect(() => window.calendarApi.onAppToast(setToast), [])
+  useEffect(() => window.calendarApi.onAppToast((payload) => {
+    const item: AppToastInfo = typeof payload === 'string' ? { message: payload } : payload
+    setToast(item.message)
+    setNotifications((current) => [item, ...current].slice(0, 40))
+  }), [])
 
   useEffect(() => {
     if (!toast) return
@@ -128,7 +197,7 @@ export default function App() {
 
   const calendarEvents = useMemo<EventInfo[]>(() => [
     ...events,
-    ...tasks.filter((task) => task.dueAt).map((task) => {
+    ...taskOccurrences.filter((task) => task.dueAt).map((task) => {
       const day = DateTime.fromISO(task.dueAt!).startOf('day')
       return {
         id: `task-${task.id}`,
@@ -140,11 +209,11 @@ export default function App() {
         endUtc: day.endOf('day').toUTC().toISO()!,
         isAllDay: true,
         colorOverride: task.status === 'completed' ? '#9aa0a6' : '#5f6368',
-        rrule: null,
+        rrule: task.rrule,
         reminders: []
       }
     })
-  ], [events, tasks])
+  ], [events, taskOccurrences])
 
   const title = useMemo(() => {
     if (view === 'month' || view === 'week' || view === '4day') {
@@ -183,8 +252,14 @@ export default function App() {
 
   const openEvent = (evt: EventInfo) => {
     if (evt.calendarId === 'tasks') {
-      const task = tasks.find((item) => `task-${item.id}` === evt.id)
-      if (task) setTaskToEdit(task)
+      const taskId = evt.id.slice('task-'.length).replace(/#\d+$/, '')
+      const task = tasks.find((item) => item.id === taskId)
+      if (task) {
+        const match = evt.id.match(/#(\d+)$/)
+        setTaskOccurrenceIndex(match ? Number(match[1]) : undefined)
+        setTaskOccurrenceDue(evt.startUtc)
+        setTaskToEdit(task)
+      }
       return
     }
     if (evt.calendarId === 'holidays') {
@@ -202,7 +277,8 @@ export default function App() {
 
   const handleEventMove = async (id: string, start: DateTime, end: DateTime) => {
     if (id.startsWith('task-')) {
-      const task = tasks.find((item) => `task-${item.id}` === id)
+      const taskId = id.slice('task-'.length).replace(/#\d+$/, '')
+      const task = tasks.find((item) => item.id === taskId)
       if (task) {
         void api.updateTask(task.id, { dueAt: start.toISODate() }).then(() => { void loadTasks(); setToast('已更新任务截止日期') }).catch((err) => setToast(err instanceof Error ? err.message : '更新任务失败'))
       }
@@ -286,6 +362,14 @@ export default function App() {
         username={username}
         avatarColor={avatarColor}
         avatarImage={avatarImage}
+        notifications={notifications}
+        onNotificationClick={(item) => {
+          if (item.kind && item.id) {
+            const w = window as unknown as { __openTarget?: (kind: 'event' | 'task', id: string) => void }
+            w.__openTarget?.(item.kind, item.id)
+          }
+        }}
+        onClearNotifications={() => setNotifications([])}
         onSearchPick={(evt) => {
           setCursor(DateTime.fromISO(evt.startUtc) as DateTime<true>)
           setView('day')
@@ -362,6 +446,8 @@ export default function App() {
           onRestore={handleRestore}
           onImportIcs={handleImportIcs}
           onOpenRecycleBin={() => setRecycleOpen(true)}
+          notificationsEnabled={notificationsEnabled}
+          onNotificationsChange={(enabled) => { setNotificationsEnabled(enabled); void window.calendarApi.setNotificationSettings(enabled) }}
           onClose={() => setSettingsOpen(false)}
         />
       )}
@@ -371,7 +457,7 @@ export default function App() {
       {appearanceOpen && <AppearanceDialog theme={theme} onThemeChange={setTheme} onClose={() => setAppearanceOpen(false)} />}
       {profileOpen && <ProfileDialog username={username} avatarColor={avatarColor} avatarImage={avatarImage} onEdit={() => setSettingsOpen(true)} onClose={() => setProfileOpen(false)} />}
       {calendarToEdit && <CalendarEditDialog calendar={calendarToEdit} onSave={(patch) => handleCalendarUpdate(calendarToEdit.id, patch)} onClose={() => setCalendarToEdit(null)} />}
-      {taskToEdit && <TaskDialog task={taskToEdit} onClose={() => setTaskToEdit(null)} onSaved={(message) => { setTaskToEdit(null); setToast(message); void loadTasks() }} />}
+      {taskToEdit && <TaskDialog task={taskToEdit} occurrenceIndex={taskOccurrenceIndex} occurrenceDue={taskOccurrenceDue} onClose={() => { setTaskToEdit(null); setTaskOccurrenceIndex(undefined); setTaskOccurrenceDue(undefined) }} onSaved={(message) => { setTaskToEdit(null); setTaskOccurrenceIndex(undefined); setTaskOccurrenceDue(undefined); setToast(message); void loadTasks(); void loadTaskOccurrences() }} />}
 
       {agendaDay && (
         <DayAgendaDialog

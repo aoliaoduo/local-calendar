@@ -1,4 +1,5 @@
 import type { CalendarService } from './service'
+export { isReminderDue } from './reminders'
 
 export type RpcHandler = (params: Record<string, unknown>) => unknown | Promise<unknown>
 
@@ -34,8 +35,12 @@ export function createMethodTable(svc: CalendarService): MethodTable {
   register('tasks.create', true, (p) => svc.createTask(p as never))
   register('tasks.get', false, (p) => svc.getTask(p.id as string))
   register('tasks.list', false, (p) => svc.listTasks(p.filter as never))
+  register('tasks.occurrences', false, (p) => svc.listTaskOccurrences(p.from as string | undefined, p.to as string | undefined))
   register('tasks.update', true, (p) => svc.updateTask(p.id as string, p.patch as never))
+  register('tasks.updateOccurrence', true, (p) => svc.updateTaskOccurrence(p.id as string, p.occurrenceIndex as number, p.patch as never))
+  register('tasks.deleteOccurrence', true, (p) => svc.deleteTaskOccurrence(p.id as string, p.occurrenceIndex as number))
   register('tasks.delete', true, (p) => svc.deleteTask(p.id as string))
+  register('tasks.reorder', true, (p) => svc.reorderTasks(p.ids as string[]))
   register('trash.list', false, () => svc.listTrash())
   register('trash.restore', true, (p) => svc.restoreTrash(p.id as string))
   register('trash.delete', true, (p) => svc.deleteTrash(p.id as string))

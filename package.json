@@ -1,6 +1,6 @@
 {
   "name": "local-calendar",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Local Google Calendar clone with tasks, operable via CLI",
   "main": "out/main/index.js",
   "type": "module",
@@ -11,6 +11,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "typecheck": "tsc -b --pretty false",
+    "test": "npm run build && node --experimental-strip-types scripts/test-service.mjs",
     "dist:win": "npm run build && electron-builder --win portable",
     "dist:win:proxy": "set HTTP_PROXY=http://127.0.0.1:7890&& set HTTPS_PROXY=http://127.0.0.1:7890&& set ALL_PROXY=http://127.0.0.1:7890&& set ELECTRON_GET_USE_PROXY=true&& set GLOBAL_AGENT_HTTP_PROXY=http://127.0.0.1:7890&& npm run dist:win",
     "start": "electron-vite preview",
@@ -29,7 +30,7 @@
     "icon": "src/renderer/icon.ico",
     "asar": true,
     "directories": {
-      "output": "portable-v2.0.0"
+      "output": "portable-v2.1.0"
     },
     "files": [
       "out/**/*",

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { DateTime } from 'luxon'
 import { getLunarMonthLabel } from '@shared/lunar'
-import { api, type CalendarInfo, type EventInfo } from '../api'
+import { api, type AppToastInfo, type CalendarInfo, type EventInfo } from '../api'
 import { fmtEventTime } from '../dateUtils'
 
 export type ViewKind = 'day' | '4day' | 'week' | 'month' | 'year' | 'agenda'
@@ -29,6 +29,9 @@ interface TopBarProps {
   username: string
   avatarColor: string
   avatarImage: string | null
+  notifications: AppToastInfo[]
+  onNotificationClick: (notification: AppToastInfo) => void
+  onClearNotifications: () => void
 }
 
 const VIEW_LABEL: Record<ViewKind, string> = { day: '日', '4day': '4 天', week: '周', month: '月', year: '年', agenda: '日程' }
@@ -55,7 +58,10 @@ export default function TopBar({
   onAvatarClick,
   username,
   avatarColor,
-  avatarImage
+  avatarImage,
+  notifications,
+  onNotificationClick,
+  onClearNotifications
 }: TopBarProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
@@ -63,6 +69,7 @@ export default function TopBar({
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<EventInfo[]>([])
   const [maximized, setMaximized] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const today = DateTime.now()
   const dayNum = today.day
@@ -180,6 +187,25 @@ export default function TopBar({
       )}
 
       <div className="topbar-right">
+        <div className="notification-menu-wrap">
+          <button className={`icon-btn${notificationsOpen ? ' active' : ''}`} title="通知" onClick={() => setNotificationsOpen((value) => !value)}>
+            <span className="material-icons">notifications</span>
+            {notifications.length > 0 && <span className="notification-count">{Math.min(99, notifications.length)}</span>}
+          </button>
+          {notificationsOpen && (
+            <>
+              <div className="menu-mask" onClick={() => setNotificationsOpen(false)} />
+              <div className="notification-menu">
+                <div className="notification-head"><span>通知</span><button className="btn-text compact" onClick={onClearNotifications}>清空</button></div>
+                {notifications.length === 0 ? <div className="notification-empty">暂无通知</div> : notifications.map((item, index) => (
+                  <button className="notification-item" key={`${item.message}-${index}`} onClick={() => { setNotificationsOpen(false); onNotificationClick(item) }}>
+                    <span className="material-icons">{item.kind === 'task' ? 'check_circle' : 'event'}</span><span>{item.message}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
         <button
           className={`icon-btn${searchOpen ? ' active' : ''}`}
           title="搜索"

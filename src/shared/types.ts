@@ -48,6 +48,10 @@ export interface Task {
   notes: string | null
   dueAt: string | null
   reminderMinutes: number | null
+  priority: number
+  sortOrder: number
+  rrule: string | null
+  exdates: string[]
   completedAt: string | null
   status: TaskStatus
   createdAt: string
@@ -86,6 +90,8 @@ export interface CreateTaskInput {
   notes?: string
   dueAt?: string
   reminderMinutes?: number | null
+  priority?: number
+  rrule?: string | null
 }
 
 export interface UpdateTaskInput {
@@ -93,6 +99,8 @@ export interface UpdateTaskInput {
   notes?: string | null
   dueAt?: string | null
   reminderMinutes?: number | null
+  priority?: number
+  rrule?: string | null
   completed?: boolean
 }
 

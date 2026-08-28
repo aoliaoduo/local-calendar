@@ -8,8 +8,8 @@ contextBridge.exposeInMainWorld('calendarApi', {
     ipcRenderer.on('data-changed', listener)
     return () => ipcRenderer.removeListener('data-changed', listener)
   },
-  onAppToast: (callback: (message: string) => void) => {
-    const listener = (_e: unknown, message: string) => callback(message)
+  onAppToast: (callback: (payload: { message: string; kind?: 'event' | 'task'; id?: string } | string) => void) => {
+    const listener = (_e: unknown, payload: { message: string; kind?: 'event' | 'task'; id?: string } | string) => callback(payload)
     ipcRenderer.on('app-toast', listener)
     return () => ipcRenderer.removeListener('app-toast', listener)
   },
@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld('calendarApi', {
     return () => ipcRenderer.removeListener('window-state-changed', listener)
   },
   windowClose: () => ipcRenderer.send('window-close'),
+  getNotificationSettings: () => ipcRenderer.invoke('notification-settings:get') as Promise<{ notificationsEnabled: boolean }>,
+  setNotificationSettings: (enabled: boolean) => ipcRenderer.invoke('notification-settings:set', enabled) as Promise<{ notificationsEnabled: boolean }>,
   openDataDir: () => ipcRenderer.invoke('open-data-dir') as Promise<string>,
   backupData: () => ipcRenderer.invoke('backup-data') as Promise<string | null>,
   restoreData: () => ipcRenderer.invoke('restore-data') as Promise<string | null>,

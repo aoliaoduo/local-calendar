@@ -8,7 +8,31 @@ import { CalendarService } from '../shared/service'
 import { createMethodTable } from '../shared/rpc-methods'
 import { getDbPath, getRpcInfoPath, getDataDir } from '../shared/paths'
 import type { Task } from '../shared/types'
+import { isReminderDue } from '../shared/reminders'
 import { existsSync, copyFileSync, readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, statSync, unlinkSync } from 'node:fs'
+
+const windowStatePath = () => join(getDataDir(), 'window-state.json')
+const preferencesPath = () => join(getDataDir(), 'preferences.json')
+interface NotificationPreferences { notificationsEnabled: boolean }
+function readNotificationPreferences(): NotificationPreferences {
+  try {
+    const value = JSON.parse(readFileSync(preferencesPath(), 'utf8')) as Partial<NotificationPreferences>
+    return { notificationsEnabled: value.notificationsEnabled !== false }
+  } catch {
+    return { notificationsEnabled: true }
+  }
+}
+interface WindowState { x?: number; y?: number; width?: number; height?: number; maximized?: boolean }
+function readWindowState(): WindowState {
+  try { return JSON.parse(readFileSync(windowStatePath(), 'utf8')) as WindowState } catch { return {} }
+}
+function saveWindowState(win: BrowserWindow): void {
+  try {
+    const bounds = win.isMaximized() ? undefined : win.getBounds()
+    const previous = readWindowState()
+    writeFileSync(windowStatePath(), JSON.stringify({ ...previous, ...(bounds ?? {}), maximized: win.isMaximized() }, null, 2))
+  } catch { /* 状态保存失败不影响应用 */ }
+}
 
 function configurePortableStorage(): void {
   const executableDir = app.isPackaged
@@ -140,9 +164,11 @@ function startRpcServer(getWindows: () => BrowserWindow[]): void {
 
 function createWindow(): void {
   const workArea = screen.getPrimaryDisplay().workAreaSize
+  const saved = readWindowState()
   const win = new BrowserWindow({
-    width: Math.min(1440, workArea.width),
-    height: Math.min(860, workArea.height),
+    width: saved.width ?? Math.min(1440, workArea.width),
+    height: saved.height ?? Math.min(860, workArea.height),
+    ...(typeof saved.x === 'number' && typeof saved.y === 'number' ? { x: saved.x, y: saved.y } : {}),
     minWidth: 1024,
     minHeight: 680,
     center: true,
@@ -160,13 +186,18 @@ function createWindow(): void {
     }
   })
   win.on('close', (event) => {
+    saveWindowState(win)
     if (isQuitting) return
     event.preventDefault()
     win.hide()
   })
   win.on('system-context-menu', (event) => event.preventDefault())
+  win.on('resize', () => saveWindowState(win))
+  win.on('move', () => saveWindowState(win))
+  win.on('maximize', () => saveWindowState(win))
+  win.on('unmaximize', () => saveWindowState(win))
   win.on('ready-to-show', () => {
-    win.maximize()
+    if (saved.maximized !== false) win.maximize()
     win.show()
     setTimeout(() => checkReminders(), 1500)
     setTimeout(() => void runAutoBackup(), 5000)
@@ -176,6 +207,17 @@ function createWindow(): void {
   } else {
     void win.loadFile(join(__dirname, '../renderer/index.html'))
   }
+}
+
+function focusTarget(kind: 'event' | 'task', id: string): void {
+  const win = BrowserWindow.getAllWindows()[0]
+  if (!win) return
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+  setTimeout(() => {
+    void win.webContents.executeJavaScript(`window.__openTarget && window.__openTarget(${JSON.stringify(kind)}, ${JSON.stringify(id)})`).catch(() => {})
+  }, 120)
 }
 
 function createTray(): void {
@@ -197,11 +239,11 @@ function buildTrayMenu(): Menu {
   try {
     eventItems = svc.listEvents(today, today).slice(0, 8).map((event) => ({
       label: `${event.isAllDay ? '全天' : DateTime.fromISO(event.startUtc).toLocal().toFormat('HH:mm')}  ${event.title}`,
-      click: () => BrowserWindow.getAllWindows()[0]?.show()
+      click: () => focusTarget('event', event.id)
     }))
-    taskItems = svc.listTasks({ status: 'needsAction' }).slice(0, 8).map((task) => ({
+    taskItems = svc.listTaskOccurrences(today, today).filter((task) => task.status === 'needsAction').slice(0, 8).map((task) => ({
       label: task.dueAt ? `${task.title}（${DateTime.fromISO(task.dueAt).toLocal().toFormat('M月d日')}）` : task.title,
-      click: () => BrowserWindow.getAllWindows()[0]?.show()
+      click: () => focusTarget('task', task.id)
     }))
   } catch {
     eventItems = []
@@ -286,32 +328,32 @@ async function runAutoBackup(): Promise<void> {
 
 const firedReminders = new Set<string>()
 
-function fireReminder(evtTitle: string, when: DateTime, leadMin: number): void {
+function fireReminder(evtTitle: string, when: DateTime, leadMin: number, eventId?: string): void {
+  if (!readNotificationPreferences().notificationsEnabled) return
   const timeLabel = when.toFormat('HH:mm')
   const body = leadMin > 0 ? `${timeLabel} 开始（提前 ${leadMin} 分钟提醒）` : `${timeLabel} 开始`
   try {
     const n = new Notification({ title: evtTitle, body })
-    n.on('click', () => {
-      for (const win of BrowserWindow.getAllWindows()) win.show()
-    })
+    n.on('click', () => eventId ? focusTarget('event', eventId) : BrowserWindow.getAllWindows()[0]?.show())
     n.show()
   } catch {
     // 系统通知失败时仍显示应用内提示
   }
-  for (const win of BrowserWindow.getAllWindows()) win.webContents.send('app-toast', `提醒：${evtTitle} · ${body}`)
+  for (const win of BrowserWindow.getAllWindows()) win.webContents.send('app-toast', { message: `提醒：${evtTitle} · ${body}`, kind: 'event', id: eventId })
 }
 
-function fireTaskReminder(taskTitle: string, dueAt: DateTime, leadMin: number): void {
+function fireTaskReminder(taskTitle: string, dueAt: DateTime, leadMin: number, taskId?: string): void {
+  if (!readNotificationPreferences().notificationsEnabled) return
   const timeLabel = dueAt.toFormat('HH:mm')
   const body = leadMin > 0 ? `截止 ${timeLabel}（提前 ${leadMin} 分钟提醒）` : `截止 ${timeLabel}`
   try {
     const n = new Notification({ title: `任务：${taskTitle}`, body })
-    n.on('click', () => BrowserWindow.getAllWindows()[0]?.show())
+    n.on('click', () => taskId ? focusTarget('task', taskId) : BrowserWindow.getAllWindows()[0]?.show())
     n.show()
   } catch {
     // 应用内提示仍会发送
   }
-  for (const win of BrowserWindow.getAllWindows()) win.webContents.send('app-toast', `任务提醒：${taskTitle} · ${body}`)
+  for (const win of BrowserWindow.getAllWindows()) win.webContents.send('app-toast', { message: `任务提醒：${taskTitle} · ${body}`, kind: 'task', id: taskId })
 }
 
 function checkReminders(): void {
@@ -333,16 +375,15 @@ function checkReminders(): void {
       const key = `${evt.id}|${evt.startUtc}|${r.minutes}`
       if (firedReminders.has(key)) continue
       const fireAt = start.minus({ minutes: r.minutes })
-      const diffSec = now.diff(fireAt, 'seconds').seconds
-      if (diffSec >= 0 && diffSec < 60) {
+      if (isReminderDue(now, fireAt)) {
         firedReminders.add(key)
-        fireReminder(evt.title, start, r.minutes)
+        fireReminder(evt.title, start, r.minutes, evt.id)
       }
     }
   }
   let tasks: Task[]
   try {
-    tasks = svc.listTasks({ status: 'needsAction' })
+    tasks = svc.listTaskOccurrences(from, to).filter((task) => task.status === 'needsAction')
   } catch {
     tasks = []
   }
@@ -353,10 +394,9 @@ function checkReminders(): void {
     const fireAt = dueAt.minus({ minutes: task.reminderMinutes })
     const key = `task|${task.id}|${task.updatedAt}|${task.reminderMinutes}`
     if (firedReminders.has(key)) continue
-    const diffSec = now.diff(fireAt, 'seconds').seconds
-    if (diffSec >= 0 && diffSec < 60) {
+    if (isReminderDue(now, fireAt)) {
       firedReminders.add(key)
-      fireTaskReminder(task.title, dueAt, task.reminderMinutes)
+      fireTaskReminder(task.title, dueAt, task.reminderMinutes, task.id)
     }
   }
 }
@@ -379,6 +419,12 @@ app.whenReady().then(() => {
     win.webContents.send('window-state-changed', win.isMaximized())
   })
   ipcMain.handle('window-is-maximized', (event) => BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false)
+  ipcMain.handle('notification-settings:get', () => readNotificationPreferences())
+  ipcMain.handle('notification-settings:set', (_event, enabled: boolean) => {
+    const preferences = { notificationsEnabled: enabled !== false }
+    writeFileSync(preferencesPath(), JSON.stringify(preferences, null, 2))
+    return preferences
+  })
   ipcMain.handle('print-calendar', async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return false

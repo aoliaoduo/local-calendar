@@ -14,6 +14,8 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const today = DateTime.now().toISODate()!
   const [newDue, setNewDue] = useState(today)
   const [newReminder, setNewReminder] = useState('')
+  const [newPriority, setNewPriority] = useState('0')
+  const [newRrule, setNewRrule] = useState('')
   const [showDone, setShowDone] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -23,6 +25,11 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const [editNotes, setEditNotes] = useState('')
   const moreRef = useRef<HTMLDivElement>(null)
   const [editReminder, setEditReminder] = useState('')
+  const [editPriority, setEditPriority] = useState('0')
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [filter, setFilter] = useState<'all' | 'today' | 'overdue' | 'scheduled'>('all')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [editRrule, setEditRrule] = useState('')
 
   const load = async () => {
     setTasks(await api.listTasks('all'))
@@ -46,10 +53,12 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const handleAdd = async () => {
     const title = newTitle.trim()
     if (!title) return
-    await api.createTask({ title, dueAt: newDue || undefined, reminderMinutes: newReminder === '' ? null : Number(newReminder) })
+    await api.createTask({ title, dueAt: newDue || undefined, reminderMinutes: newReminder === '' ? null : Number(newReminder), priority: Number(newPriority), rrule: newRrule || null })
     setNewTitle('')
     setNewDue(today)
     setNewReminder('')
+    setNewPriority('0')
+    setNewRrule('')
     setAdding(false)
     onToast('已添加任务')
     void load()
@@ -61,12 +70,14 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
     setEditDue(task.dueAt ? DateTime.fromISO(task.dueAt).toLocal().toFormat('yyyy-MM-dd') : '')
     setEditNotes(task.notes ?? '')
     setEditReminder(task.reminderMinutes === null ? '' : String(task.reminderMinutes))
+    setEditPriority(String(task.priority ?? 0))
+    setEditRrule(task.rrule ?? '')
   }
 
   const saveEdit = async () => {
     if (!editingId || !editTitle.trim()) return
     try {
-      await api.updateTask(editingId, { title: editTitle.trim(), dueAt: editDue || null, notes: editNotes.trim() || null, reminderMinutes: editReminder === '' ? null : Number(editReminder) })
+      await api.updateTask(editingId, { title: editTitle.trim(), dueAt: editDue || null, notes: editNotes.trim() || null, reminderMinutes: editReminder === '' ? null : Number(editReminder), priority: Number(editPriority), rrule: editRrule || null })
       setEditingId(null)
       onToast('已更新任务')
       await load()
@@ -81,12 +92,93 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const visibleOpen = open.filter(matches)
   const visibleDone = done.filter(matches)
   const todayStr = DateTime.now().toISODate()
+  const filteredOpen = visibleOpen.filter((task) => {
+    if (filter === 'all') return true
+    if (!task.dueAt) return filter === 'scheduled' ? false : false
+    const date = DateTime.fromISO(task.dueAt).toLocal().toISODate()
+    if (filter === 'today') return date === todayStr
+    if (filter === 'overdue') return date! < todayStr!
+    return true
+  })
+  const groupTasks = (items: TaskInfo[]) => {
+    const today = DateTime.now().startOf('day')
+    const groups = [
+      { key: 'overdue', label: '已逾期', items: [] as TaskInfo[] },
+      { key: 'today', label: '今天', items: [] as TaskInfo[] },
+      { key: 'upcoming', label: '接下来 7 天', items: [] as TaskInfo[] },
+      { key: 'later', label: '以后', items: [] as TaskInfo[] },
+      { key: 'none', label: '无日期', items: [] as TaskInfo[] }
+    ]
+    for (const task of items) {
+      if (!task.dueAt) groups[4].items.push(task)
+      else {
+        const day = DateTime.fromISO(task.dueAt).toLocal().startOf('day')
+        if (day < today) groups[0].items.push(task)
+        else if (day.hasSame(today, 'day')) groups[1].items.push(task)
+        else if (day <= today.plus({ days: 7 })) groups[2].items.push(task)
+        else groups[3].items.push(task)
+      }
+    }
+    return groups.filter((group) => group.items.length > 0)
+  }
+
+  const handleDrop = async (targetId: string) => {
+    if (!dragId || dragId === targetId) return
+    const ids = open.map((task) => task.id)
+    const from = ids.indexOf(dragId)
+    const to = ids.indexOf(targetId)
+    if (from < 0 || to < 0) return
+    ids.splice(from, 1)
+    ids.splice(to, 0, dragId)
+    try {
+      await api.reorderTasks(ids)
+      await load()
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : '排序失败')
+    } finally {
+      setDragId(null)
+    }
+  }
+
+  const toggleSelected = (id: string) => setSelected((current) => {
+    const next = new Set(current)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    return next
+  })
+
+  const batchComplete = async () => {
+    const ids = [...selected]
+    try {
+      await Promise.all(ids.map((id) => api.updateTask(id, { completed: true })))
+      setSelected(new Set())
+      onToast(`已完成 ${ids.length} 个任务`)
+      await load()
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : '批量完成失败')
+    }
+  }
+
+  const batchDelete = async () => {
+    const ids = [...selected]
+    if (!ids.length || !window.confirm(`将 ${ids.length} 个任务移入回收站？`)) return
+    try {
+      await Promise.all(ids.map((id) => api.deleteTask(id)))
+      setSelected(new Set())
+      onToast(`已删除 ${ids.length} 个任务`)
+      await load()
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : '批量删除失败')
+    }
+  }
 
   const renderTask = (t: TaskInfo) => {
     const dueDate = t.dueAt ? DateTime.fromISO(t.dueAt).toLocal() : null
     const overdue = dueDate && dueDate.toISODate()! < todayStr
     return (
-      <div key={t.id} className="task-item">
+      <div key={t.id} className={`task-item${dragId === t.id ? ' dragging' : ''}`} draggable={t.status === 'needsAction'} onDragStart={() => setDragId(t.id)} onDragEnd={() => setDragId(null)} onDragOver={(event) => { if (t.status === 'needsAction') event.preventDefault() }} onDrop={(event) => { event.preventDefault(); void handleDrop(t.id) }}>
+        {t.status === 'needsAction' && <span className="material-icons task-drag-handle" title="拖动排序">drag_handle</span>}
+        <input className="task-select" type="checkbox" aria-label={`选择${t.title}`} checked={selected.has(t.id)} onChange={() => toggleSelected(t.id)} onClick={(event) => event.stopPropagation()} />
         <button
           className={`task-check${t.status === 'completed' ? ' done' : ''}`}
           title={t.status === 'completed' ? '标记为未完成' : '标记为已完成'}
@@ -107,6 +199,8 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
               <option value="30">提前 30 分钟</option>
               <option value="60">提前 1 小时</option>
             </select>
+            <select value={editRrule} onChange={(event) => setEditRrule(event.target.value)}><option value="">不重复</option><option value="FREQ=DAILY">每天</option><option value="FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR">每个工作日</option><option value="FREQ=WEEKLY">每周</option><option value="FREQ=MONTHLY">每月</option><option value="FREQ=YEARLY">每年</option></select>
+            <select value={editPriority} onChange={(event) => setEditPriority(event.target.value)}><option value="1">高优先级</option><option value="0">普通优先级</option><option value="-1">低优先级</option></select>
             <input placeholder="备注（可选）" value={editNotes} onChange={(event) => setEditNotes(event.target.value)} />
             <div className="task-add-actions">
               <button className="btn-text compact" onClick={() => void saveEdit()}>保存</button>
@@ -115,7 +209,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
           </div>
         ) : (
           <div className="task-body" onDoubleClick={() => startEdit(t)}>
-            <div className={`task-title${t.status === 'completed' ? ' done' : ''}`}>{t.title}</div>
+            <div className={`task-title${t.status === 'completed' ? ' done' : ''}`}>{t.priority === 1 && <span className="material-icons task-priority high">priority_high</span>}{t.priority === -1 && <span className="material-icons task-priority low">arrow_downward</span>}{t.rrule && <span className="material-icons task-priority repeat">repeat</span>}{t.title}</div>
             {dueDate && (
               <div className={`task-due${overdue ? ' overdue' : ''}`}>
                 <span className="material-icons">calendar_today</span>
@@ -166,6 +260,10 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
 
       <div className="tasks-list">
         <input className="task-search" placeholder="搜索任务" value={query} onChange={(event) => setQuery(event.target.value)} />
+        <div className="task-filters" role="tablist" aria-label="任务筛选">
+          {([['all', '全部'], ['today', '今天'], ['overdue', '逾期'], ['scheduled', '有日期']] as const).map(([key, label]) => <button key={key} className={filter === key ? 'active' : ''} onClick={() => setFilter(key)}>{label}</button>)}
+        </div>
+        {selected.size > 0 && <div className="task-bulk-bar"><span>已选 {selected.size}</span><button className="btn-text compact" onClick={() => void batchComplete()}>完成</button><button className="btn-text compact danger" onClick={() => void batchDelete()}>删除</button><button className="icon-btn compact" title="清除选择" onClick={() => setSelected(new Set())}><span className="material-icons">close</span></button></div>}
         {adding ? (
           <div className="task-add-form">
             <span className="task-add-check" />
@@ -201,6 +299,8 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
               <option value="30">提前 30 分钟</option>
               <option value="60">提前 1 小时</option>
             </select>
+            <select className="task-add-reminder" value={newRrule} onChange={(event) => setNewRrule(event.target.value)}><option value="">不重复</option><option value="FREQ=DAILY">每天</option><option value="FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR">每个工作日</option><option value="FREQ=WEEKLY">每周</option><option value="FREQ=MONTHLY">每月</option><option value="FREQ=YEARLY">每年</option></select>
+            <select className="task-add-reminder" value={newPriority} onChange={(event) => setNewPriority(event.target.value)}><option value="1">高优先级</option><option value="0">普通优先级</option><option value="-1">低优先级</option></select>
             <div className="task-add-actions">
               <button className="btn-text" onClick={() => void handleAdd()}>
                 保存
@@ -224,7 +324,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
           </button>
         )}
 
-        {visibleOpen.map(renderTask)}
+        {groupTasks(filteredOpen).map((group) => <section className="task-group" key={group.key}><div className="task-group-label">{group.label}</div>{group.items.map(renderTask)}</section>)}
 
         {visibleDone.length > 0 && (
           <>

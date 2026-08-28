@@ -173,6 +173,12 @@ function normalizeTaskReminder(value: number): number {
   return value
 }
 
+function normalizeTaskPriority(value: number | undefined): number {
+  const priority = value ?? 0
+  if (!Number.isInteger(priority) || priority < -1 || priority > 1) throw new Error('任务优先级必须是 -1、0 或 1')
+  return priority
+}
+
 function parseExdates(value: unknown): string[] {
   if (typeof value !== 'string') return []
   try {
@@ -235,6 +241,10 @@ function rowToTask(r: Record<string, unknown>): Task {
     notes: (r.notes as string | null) ?? null,
     dueAt: (r.due_at as string | null) ?? null,
     reminderMinutes: typeof r.reminder_minutes === 'number' ? r.reminder_minutes : null,
+    priority: typeof r.priority === 'number' ? r.priority : 0,
+    sortOrder: typeof r.sort_order === 'number' ? r.sort_order : 0,
+    rrule: (r.rrule as string | null) ?? null,
+    exdates: parseExdates(r.exdates),
     completedAt: (r.completed_at as string | null) ?? null,
     status: r.status as Task['status'],
     createdAt: r.created_at as string,
@@ -535,14 +545,17 @@ export class CalendarService {
 
   createTask(input: CreateTaskInput): Task {
     const due = input.dueAt ? parseWhen(input.dueAt, true) : null
+    const rrule = input.rrule?.trim() || null
+    if (rrule && !parseRule(rrule)) throw new Error(`无法解析任务重复规则: "${input.rrule}"`)
     const id = randomUUID()
     const now = nowIso()
     const reminderMinutes = input.reminderMinutes !== undefined && input.reminderMinutes !== null
       ? normalizeTaskReminder(input.reminderMinutes)
       : null
+    const priority = normalizeTaskPriority(input.priority)
     this.db
-      .prepare('INSERT INTO tasks (id, title, notes, due_at, reminder_minutes, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(id, input.title.trim() || '（无标题）', input.notes ?? null, due ? due.toUTC().toISO() : null, reminderMinutes, 'needsAction', now, now)
+      .prepare('INSERT INTO tasks (id, title, notes, due_at, reminder_minutes, priority, sort_order, rrule, exdates, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(id, input.title.trim() || '（无标题）', input.notes ?? null, due ? due.toUTC().toISO() : null, reminderMinutes, priority, Date.now(), rrule, '[]', 'needsAction', now, now)
     return this.getTask(id)!
   }
 
@@ -567,7 +580,7 @@ export class CalendarService {
       }
     }
     if (conds.length) sql += ' WHERE ' + conds.join(' AND ')
-    sql += " ORDER BY completed_at IS NULL DESC, due_at IS NULL, due_at, created_at"
+    sql += " ORDER BY completed_at IS NULL DESC, sort_order, priority DESC, due_at IS NULL, due_at, created_at"
     const rows = this.db.prepare(sql).all(...args) as Record<string, unknown>[]
     return rows.map(rowToTask)
   }
@@ -585,6 +598,9 @@ export class CalendarService {
     const reminderMinutes = patch.reminderMinutes !== undefined
       ? (patch.reminderMinutes === null ? null : normalizeTaskReminder(patch.reminderMinutes))
       : (typeof cur.reminder_minutes === 'number' ? cur.reminder_minutes : null)
+    const priority = patch.priority !== undefined ? normalizeTaskPriority(patch.priority) : (typeof cur.priority === 'number' ? cur.priority : 0)
+    const rrule = patch.rrule !== undefined ? (patch.rrule?.trim() || null) : ((cur.rrule as string | null) ?? null)
+    if (rrule && !parseRule(rrule)) throw new Error(`无法解析任务重复规则: "${patch.rrule}"`)
     let status = cur.status as string
     let completedAt = cur.completed_at as string | null
     if (patch.completed !== undefined) {
@@ -596,9 +612,10 @@ export class CalendarService {
         completedAt = null
       }
     }
+    const exdates = (patch.dueAt !== undefined || patch.rrule !== undefined) ? [] : parseExdates(cur.exdates)
     this.db
-      .prepare('UPDATE tasks SET title = ?, notes = ?, due_at = ?, reminder_minutes = ?, status = ?, completed_at = ?, updated_at = ? WHERE id = ?')
-      .run(title, notes, dueAt, reminderMinutes, status, completedAt, nowIso(), id)
+      .prepare('UPDATE tasks SET title = ?, notes = ?, due_at = ?, reminder_minutes = ?, priority = ?, rrule = ?, exdates = ?, status = ?, completed_at = ?, updated_at = ? WHERE id = ?')
+      .run(title, notes, dueAt, reminderMinutes, priority, rrule, JSON.stringify(exdates), status, completedAt, nowIso(), id)
     return this.getTask(id)
   }
 
@@ -607,6 +624,101 @@ export class CalendarService {
     if (!row) return false
     this.db.prepare('INSERT INTO trash (id, kind, title, payload, deleted_at) VALUES (?, ?, ?, ?, ?)').run(randomUUID(), 'task', row.title as string, JSON.stringify(row), nowIso())
     return this.db.prepare('DELETE FROM tasks WHERE id = ?').run(id).changes > 0
+  }
+
+  reorderTasks(ids: string[]): boolean {
+    const current = this.listTasks({ status: 'all' })
+    const requested = [...new Set(ids)].filter((id) => current.some((task) => task.id === id))
+    const order = [...requested, ...current.map((task) => task.id).filter((id) => !requested.includes(id))]
+    const update = this.db.prepare('UPDATE tasks SET sort_order = ?, updated_at = ? WHERE id = ?')
+    this.db.transaction(() => {
+      order.forEach((id, index) => update.run(index, nowIso(), id))
+    })()
+    return true
+  }
+
+  listTaskOccurrences(from?: string, to?: string): Task[] {
+    const start = from ? (parseWhen(from, false) ?? DateTime.now().startOf('day')) : DateTime.now().startOf('day')
+    const end = to ? (parseWhen(to, true) ?? start.plus({ days: 42 })) : start.plus({ days: 42 })
+    const output: Task[] = []
+    for (const task of this.listTasks({ status: 'all' })) {
+      if (!task.dueAt) continue
+      const due = DateTime.fromISO(task.dueAt).toLocal().startOf('day')
+      if (!task.rrule) {
+        if (due >= start.startOf('day') && due <= end.endOf('day')) output.push(task)
+        continue
+      }
+      const rule = parseRule(task.rrule)
+      if (!rule) {
+        if (due >= start.startOf('day') && due <= end.endOf('day')) output.push(task)
+        continue
+      }
+      let idx = 0
+      for (const occurrence of ruleOccurrences(rule, due)) {
+        if (rule.count !== null && idx >= rule.count) break
+        if (rule.until && occurrence > rule.until) break
+        if (occurrence > end.endOf('day')) break
+        const occurrenceIso = occurrence.toUTC().toISO()!
+        if ((task.exdates ?? []).includes(occurrenceIso)) {
+          idx++
+          continue
+        }
+        if (occurrence >= start.startOf('day')) {
+          output.push({ ...task, id: `${task.id}#${idx}`, dueAt: occurrenceIso })
+        }
+        idx++
+        if (idx > 1500) break
+      }
+    }
+    return output
+  }
+
+  private recurringTaskOccurrence(task: Task, occurrenceIndex: number): DateTime | null {
+    if (!task.rrule || !task.dueAt || !Number.isInteger(occurrenceIndex) || occurrenceIndex < 0) return null
+    const rule = parseRule(task.rrule)
+    if (!rule) return null
+    const first = DateTime.fromISO(task.dueAt).toLocal().startOf('day')
+    let index = 0
+    for (const occurrence of ruleOccurrences(rule, first)) {
+      if (rule.count !== null && index >= rule.count) break
+      if (rule.until && occurrence > rule.until) break
+      if (index === occurrenceIndex) return occurrence
+      index++
+    }
+    return null
+  }
+
+  deleteTaskOccurrence(id: string, occurrenceIndex: number): boolean {
+    const task = this.getTask(id)
+    if (!task) throw new Error(`待办不存在: ${id}`)
+    const occurrence = this.recurringTaskOccurrence(task, occurrenceIndex)
+    if (!occurrence) throw new Error('重复任务实例不存在')
+    const exdates = [...new Set([...(task.exdates ?? []), occurrence.toUTC().toISO()!])]
+    this.db.prepare('UPDATE tasks SET exdates = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(exdates), nowIso(), id)
+    return true
+  }
+
+  updateTaskOccurrence(id: string, occurrenceIndex: number, patch: UpdateTaskInput): Task {
+    const task = this.getTask(id)
+    if (!task) throw new Error(`待办不存在: ${id}`)
+    const occurrence = this.recurringTaskOccurrence(task, occurrenceIndex)
+    if (!occurrence) throw new Error('重复任务实例不存在')
+    const standalone = this.createTask({
+      title: patch.title ?? task.title,
+      notes: patch.notes !== undefined ? patch.notes ?? undefined : task.notes ?? undefined,
+      dueAt: patch.dueAt !== undefined ? patch.dueAt ?? undefined : occurrence.toISODate() ?? undefined,
+      reminderMinutes: patch.reminderMinutes !== undefined ? patch.reminderMinutes : task.reminderMinutes,
+      priority: patch.priority !== undefined ? patch.priority : task.priority,
+      rrule: null
+    })
+    try {
+      if (patch.completed !== undefined) this.updateTask(standalone.id, { completed: patch.completed })
+      this.deleteTaskOccurrence(id, occurrenceIndex)
+    } catch (error) {
+      this.deleteTask(standalone.id)
+      throw error
+    }
+    return this.getTask(standalone.id)!
   }
 
   listTrash(): TrashItem[] {
@@ -630,9 +742,9 @@ export class CalendarService {
       ).run(payload.id, calendarId, payload.title, payload.description ?? null, payload.location ?? null, payload.start_utc, payload.end_utc, payload.is_all_day ?? 0, payload.color_override ?? null, payload.rrule ?? null, payload.exdates ?? '[]', payload.status ?? 'confirmed', payload.reminders ?? '[]', payload.created_at, payload.updated_at)
     } else {
       this.db.prepare(
-        `INSERT OR REPLACE INTO tasks (id, title, notes, due_at, reminder_minutes, completed_at, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(payload.id, payload.title, payload.notes ?? null, payload.due_at ?? null, payload.reminder_minutes ?? null, payload.completed_at ?? null, payload.status ?? 'needsAction', payload.created_at, payload.updated_at)
+        `INSERT OR REPLACE INTO tasks (id, title, notes, due_at, reminder_minutes, priority, sort_order, rrule, exdates, completed_at, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(payload.id, payload.title, payload.notes ?? null, payload.due_at ?? null, payload.reminder_minutes ?? null, payload.priority ?? 0, payload.sort_order ?? Date.now(), payload.rrule ?? null, payload.exdates ?? '[]', payload.completed_at ?? null, payload.status ?? 'needsAction', payload.created_at, payload.updated_at)
     }
     this.db.prepare('DELETE FROM trash WHERE id = ?').run(id)
     return true
@@ -647,7 +759,7 @@ export class CalendarService {
   getTodayAgenda(): { date: string; events: CalendarEvent[]; tasks: Task[] } {
     const today = DateTime.now().startOf('day')
     const events = this.listEvents(today.toISODate()!, today.toISODate()!)
-    const tasks = this.listTasks({ status: 'needsAction' })
+    const tasks = this.listTaskOccurrences(today.toISODate()!, today.toISODate()!).filter((task) => task.status === 'needsAction')
     return { date: today.toISODate()!, events, tasks }
   }
 }

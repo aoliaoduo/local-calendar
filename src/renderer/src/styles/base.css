@@ -22,6 +22,7 @@
 
 :root[data-theme='dark'] {
   --surface: #0b0f17;
+  --g-blue-text: #8ab4f8;
   --text-1: #f1f5fb;
   --text-2: #d7e0ee;
   --text-3: #aab8cb;
@@ -476,6 +477,79 @@ select {
 
 .view-menu-wrap {
   position: relative;
+}
+
+.notification-menu-wrap {
+  position: relative;
+}
+
+.notification-count {
+  position: absolute;
+  top: 2px;
+  right: 1px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--g-blue);
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.notification-menu {
+  position: absolute;
+  top: 42px;
+  right: 0;
+  width: 340px;
+  max-height: 420px;
+  overflow-y: auto;
+  background: var(--surface);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+  padding: 8px 0;
+  z-index: 95;
+}
+
+.notification-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  color: var(--text-1);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.notification-empty {
+  padding: 28px 16px;
+  color: var(--text-3);
+  text-align: center;
+  font-size: 13px;
+}
+
+.notification-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 16px;
+  color: var(--text-2);
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.notification-item:hover {
+  background: var(--hover);
+}
+
+.notification-item .material-icons {
+  flex: 0 0 auto;
+  color: var(--g-blue);
+  font-size: 18px;
 }
 
 .view-select {
@@ -1005,6 +1079,21 @@ select {
   padding: 20px 24px 16px;
 }
 
+:root[data-theme='dark'] .settings-dialog,
+:root[data-theme='dark'] .recycle-dialog,
+:root[data-theme='dark'] .help-dialog,
+:root[data-theme='dark'] .profile-dialog,
+:root[data-theme='dark'] .calendar-edit-dialog {
+  background: #101722;
+  color: var(--text-1);
+}
+
+:root[data-theme='dark'] .appearance-dialog,
+:root[data-theme='dark'] .task-dialog {
+  background: #101722;
+  color: var(--text-1);
+}
+
 .settings-head,
 .settings-field,
 .settings-calendar-row,
@@ -1041,6 +1130,21 @@ select {
   font-size: 15px;
   font-weight: 500;
   margin-bottom: 10px;
+}
+
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.settings-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--g-blue);
 }
 
 .settings-field {

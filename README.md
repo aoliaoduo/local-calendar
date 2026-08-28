@@ -2,11 +2,14 @@
 
 本地版日历应用（含待办），Windows 10 桌面端。数据全本地存储（SQLite），提供 CLI 供人工与 AI 操作。
 
+当前版本：`2.1.0`
+
 ## 启动
 
 ```bash
 npm install     # 首次
 npm run dev     # 开发模式启动
+npm test        # 构建并运行共享服务冒烟测试（含提醒边界）
 ```
 
 生产模式：`npm run build && npm start`
@@ -34,20 +37,24 @@ localcal search 评审
 localcal export -f 2026-08-28 -t 2027-08-28 -o calendar.ics
 localcal import -i calendar.ics
 localcal task add "交周报" -d 2026-09-04
+localcal task add "每日站会" -d 2026-09-01 -r weekdays
 localcal task update 1a2b3c4d --title "交周报（已确认）" -n "周五 18:00 前"
 localcal task list                               # 未完成待办（--all 全部 / --done 已完成）
-localcal task done 1a2b3c4d
+localcal task list --today                       # 只看今天任务
+localcal task list --overdue                     # 只看逾期任务
+localcal task done 1a2b3c4d 5e6f7a8b                 # 可一次完成多个任务
+localcal task done-all --overdue                   # 批量完成逾期任务
 localcal task undo 1a2b3c4d
-localcal task delete 1a2b3c4d
+localcal task delete 1a2b3c4d 5e6f7a8b
 localcal calendars                               # 列出日历
+localcal doctor                                  # 检查数据路径和应用连接
 ```
 
 所有命令支持 `--json` 输出（程序/AI 友好）；出错时退出码为 1。AI 助手可直接在终端执行这些命令完成日程管理。
 
 ## 数据
 
-- 数据库（开发模式）：`%APPDATA%\local-calendar\calendar.db`（SQLite，WAL 模式）
-- 便携版数据：`应用目录\data\calendar.db`（SQLite，WAL 模式）
+- 数据库（开发、便携版、CLI 统一）：`项目或应用目录\data\calendar.db`（SQLite，WAL 模式）
 - 本地 RPC：与数据库位于同一数据目录，应用退出时自动清理
 
 ## 功能范围
@@ -65,11 +72,18 @@ localcal calendars                               # 列出日历
 - 打印：顶部打印按钮调用 Windows 系统打印对话框
 - 任务侧栏：右侧任务面板默认展开，可独立隐藏，不再与日历视图二选一
 - 深度融合：有截止日期的任务会显示在日历中，点击可直接编辑，拖动可修改截止日期
+- 任务重复：支持每天、工作日、每周、每月、每年重复，重复实例会投影到日历
+- 重复任务支持仅此实例编辑、删除和跳过，系列规则保持不变
 - 任务面板采用卡片式布局，支持搜索、日期快捷设置和已完成任务清理
+- 任务支持高/普通/低优先级，面板按逾期、今天、未来 7 天、以后和无日期分组
+- 任务面板支持拖拽排序，顺序会持久化到本地数据库
+- 任务面板支持全部/今天/逾期/有日期筛选和多选批量完成、删除
 - 设置菜单：设置、回收站、外观、打印，按 Google 日历的入口逻辑组织
 - 回收站与数据：模拟数据已迁移到便携版 `release/data`，启动后可直接使用
-- Windows：系统托盘显示今日安排和未完成任务，应用启用单实例运行
-- 窗口：默认居中并最大化启动，自绘标题栏不响应右键菜单
+- Windows：系统托盘显示今日安排和未完成任务，点击项目会直接定位并打开编辑，应用启用单实例运行
+- 通知：系统通知点击后直接定位到对应日程或任务
+- 通知中心：提醒会保存在应用内通知中心，可清空并点击跳转
+- 窗口：默认居中并最大化启动，记忆上次窗口尺寸、位置、最大化状态和最后视图，自绘标题栏不响应右键菜单
 - 视图：日 / 4 天 / 周 / 月 / 年 / 日程六种模式；任务截止日会作为全天项目显示在日历中
 - 账户：支持本地用户名与头像颜色，不连接云端账号
 - 任务：支持任务截止提醒，系统通知与应用内 toast 同步

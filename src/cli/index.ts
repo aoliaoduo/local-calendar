@@ -1,7 +1,7 @@
 import { readFileSync, existsSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { DateTime } from 'luxon'
-import { getRpcInfoPath, type RpcInfo } from '../shared/paths'
+import { getDataDir, getDbPath, getRpcInfoPath, type RpcInfo } from '../shared/paths'
 import { openDatabase } from '../shared/db'
 import { CalendarService } from '../shared/service'
 import { createMethodTable, type MethodTable } from '../shared/rpc-methods'
@@ -36,15 +36,18 @@ const HELP = `本地日历 CLI — 操作 Local Calendar 的日程与待办
   search <关键词>                      搜索日程
 
 待办:
-  task list [--all | --done]          列出待办（默认未完成）
-  task add <标题> [-d 截止日期] [-n 备注] [--remind 分钟]
-  task update <id> [--title 标题] [-d 截止日期] [-n 备注] [--remind 分钟|none]
-  task done <id>                      标记完成
+  task list [--all | --done] [--today | --overdue | --scheduled]
+                                      列出待办（默认未完成）
+  task add <标题> [-d 截止日期] [-n 备注] [-p 优先级] [-r 重复] [--remind 分钟]
+  task update <id> [--title 标题] [-d 截止日期] [-n 备注] [-p 优先级] [-r 重复] [--remind 分钟|none]
+  task done <id...>                   标记一个或多个任务完成
+  task done-all --today|--overdue     按日期批量完成任务
   task undo <id>                      重新打开
-  task delete <id>                    删除待办
+  task delete <id...>                 删除一个或多个待办
 
 其他:
-  calendars                           列出日历
+ calendars                           列出日历
+  doctor                              检查数据目录、数据库和应用连接
   help                                显示本帮助
 
 通用:
@@ -118,11 +121,12 @@ const SHORT_TO_LONG: Record<string, string> = {
   f: 'from',
   t: 'to',
   r: 'repeat',
+  p: 'priority',
   o: 'out',
   i: 'in'
 }
-const VALUE_FLAGS = new Set(['start', 'end', 'calendar', 'location', 'note', 'due', 'from', 'to', 'title', 'repeat', 'remind', 'out', 'in'])
-const BOOL_FLAGS = new Set(['all-day', 'all', 'done', 'json'])
+const VALUE_FLAGS = new Set(['start', 'end', 'calendar', 'location', 'note', 'due', 'from', 'to', 'title', 'repeat', 'remind', 'priority', 'out', 'in'])
+const BOOL_FLAGS = new Set(['all-day', 'all', 'done', 'today', 'overdue', 'scheduled', 'json'])
 
 const REPEAT_MAP: Record<string, string> = {
   daily: 'DAILY',
@@ -155,6 +159,15 @@ function parseTaskReminder(value: string | undefined): number | null | undefined
   const minutes = Number(value)
   if (!Number.isInteger(minutes) || minutes < 0 || minutes > 10080) throw new CliError('任务提醒分钟数必须是 0–10080 的整数')
   return minutes
+}
+
+function parseTaskPriority(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined
+  const key = value.trim().toLowerCase()
+  if (key === 'high' || key === '高' || key === '1') return 1
+  if (key === 'low' || key === '低' || key === '-1') return -1
+  if (key === 'normal' || key === '普通' || key === '0') return 0
+  throw new CliError('任务优先级可用 high、normal、low（或 1、0、-1）')
 }
 
 function icsEscape(value: string): string {
@@ -320,7 +333,7 @@ function fmtEventLine(e: CalendarEvent, calName?: string): string {
 function fmtTaskLine(t: Task): string {
   const mark = t.status === 'completed' ? '[x]' : '[ ]'
   const due = t.dueAt ? ` 截止 ${DateTime.fromISO(t.dueAt).toLocal().toFormat('yyyy-MM-dd')}` : ''
-  return `${mark} ${t.title}${due}  id:${shortId(t.id)}`
+  return `${mark} ${t.rrule ? '↻ ' : ''}${t.title}${due}  id:${shortId(t.id)}`
 }
 
 async function calNames(backend: Backend): Promise<Map<string, string>> {
@@ -497,7 +510,17 @@ async function cmdSearch(backend: Backend, queryParts: string[], json: boolean):
 
 async function cmdTaskList(backend: Backend, flags: Record<string, string | true>, json: boolean): Promise<void> {
   const status = flags.done === true ? 'completed' : flags.all === true ? 'all' : 'needsAction'
-  const tasks = await backend.call<Task[]>('tasks.list', { filter: { status } })
+  let tasks = await backend.call<Task[]>('tasks.list', { filter: { status } })
+  const today = DateTime.now().toISODate()!
+  if (flags.today === true || flags.overdue === true || flags.scheduled === true) {
+    tasks = tasks.filter((task) => {
+      if (!task.dueAt) return flags.scheduled !== true
+      const date = DateTime.fromISO(task.dueAt).toLocal().toISODate()!
+      if (flags.today === true) return date === today
+      if (flags.overdue === true) return date < today
+      return true
+    })
+  }
   if (json) return emitJson(tasks)
   const label = status === 'completed' ? '已完成待办' : status === 'all' ? '全部待办' : '未完成待办'
   console.log(`${label} (${tasks.length}):`)
@@ -520,7 +543,9 @@ async function cmdTaskAdd(
     title,
     notes: str(flags, 'note'),
     dueAt: str(flags, 'due'),
-    reminderMinutes: parseTaskReminder(str(flags, 'remind'))
+    reminderMinutes: parseTaskReminder(str(flags, 'remind')),
+    priority: parseTaskPriority(str(flags, 'priority')),
+    rrule: str(flags, 'repeat') ? repeatRrule(str(flags, 'repeat')!) : undefined
   })
   if (json) return emitJson(task)
   console.log(`已创建待办 → ${fmtTaskLine(task)}`)
@@ -528,14 +553,33 @@ async function cmdTaskAdd(
 
 async function cmdTaskDone(
   backend: Backend,
-  idPrefix: string | undefined,
+  idPrefixes: string[],
   completed: boolean,
   json: boolean
 ): Promise<void> {
-  const target = await resolveTask(backend, idPrefix)
-  const task = await backend.call<Task>('tasks.update', { id: target.id, patch: { completed } })
-  if (json) return emitJson(task)
-  console.log(completed ? `已完成: ${task.title}` : `已重新打开: ${task.title}`)
+  if (!idPrefixes.length) throw new CliError('缺少待办 ID（先用 task list 查看）')
+  const tasks: Task[] = []
+  for (const prefix of idPrefixes) {
+    const target = await resolveTask(backend, prefix)
+    tasks.push(await backend.call<Task>('tasks.update', { id: target.id, patch: { completed } }))
+  }
+  if (json) return emitJson(tasks)
+  for (const task of tasks) console.log(completed ? `已完成: ${task.title}` : `已重新打开: ${task.title}`)
+}
+
+async function cmdTaskDoneAll(backend: Backend, flags: Record<string, string | true>, json: boolean): Promise<void> {
+  if (flags.today !== true && flags.overdue !== true) throw new CliError('批量完成必须指定 --today 或 --overdue')
+  const today = DateTime.now().toISODate()!
+  const all = await backend.call<Task[]>('tasks.list', { filter: { status: 'needsAction' } })
+  const targets = all.filter((task) => {
+    if (!task.dueAt) return false
+    const date = DateTime.fromISO(task.dueAt).toLocal().toISODate()!
+    return flags.today === true ? date === today : date < today
+  })
+  const completed: Task[] = []
+  for (const task of targets) completed.push(await backend.call<Task>('tasks.update', { id: task.id, patch: { completed: true } }))
+  if (json) return emitJson(completed)
+  console.log(completed.length ? `已完成 ${completed.length} 个任务` : '没有符合条件的任务')
 }
 
 async function cmdTaskUpdate(
@@ -550,17 +594,24 @@ async function cmdTaskUpdate(
   if (flags.due !== undefined) patch.dueAt = str(flags, 'due') ?? null
   if (flags.note !== undefined) patch.notes = str(flags, 'note') ?? null
   if (flags.remind !== undefined) patch.reminderMinutes = parseTaskReminder(str(flags, 'remind'))
-  if (!Object.keys(patch).length) throw new CliError('没有要修改的字段（--title / -d / -n / --remind）')
+  if (flags.priority !== undefined) patch.priority = parseTaskPriority(str(flags, 'priority'))
+  if (flags.repeat !== undefined) patch.rrule = str(flags, 'repeat') === 'none' ? null : repeatRrule(str(flags, 'repeat')!)
+  if (!Object.keys(patch).length) throw new CliError('没有要修改的字段（--title / -d / -n / -p / -r / --remind）')
   const task = await backend.call<Task>('tasks.update', { id: target.id, patch })
   if (json) return emitJson(task)
   console.log(`已更新待办 → ${fmtTaskLine(task)}`)
 }
 
-async function cmdTaskDelete(backend: Backend, idPrefix: string | undefined, json: boolean): Promise<void> {
-  const target = await resolveTask(backend, idPrefix)
-  const ok = await backend.call<boolean>('tasks.delete', { id: target.id })
-  if (json) return emitJson({ ok, id: target.id })
-  console.log(ok ? `已删除待办「${target.title}」` : `删除失败: ${target.id}`)
+async function cmdTaskDelete(backend: Backend, idPrefixes: string[], json: boolean): Promise<void> {
+  if (!idPrefixes.length) throw new CliError('缺少待办 ID（先用 task list 查看）')
+  const results: { ok: boolean; id: string; title: string }[] = []
+  for (const prefix of idPrefixes) {
+    const target = await resolveTask(backend, prefix)
+    const ok = await backend.call<boolean>('tasks.delete', { id: target.id })
+    results.push({ ok, id: target.id, title: target.title })
+  }
+  if (json) return emitJson(results)
+  for (const result of results) console.log(result.ok ? `已删除待办「${result.title}」` : `删除失败: ${result.id}`)
 }
 
 async function cmdCalendars(backend: Backend, json: boolean): Promise<void> {
@@ -569,6 +620,26 @@ async function cmdCalendars(backend: Backend, json: boolean): Promise<void> {
   for (const c of cals) {
     console.log(`${c.id.padEnd(10)} ${c.name.padEnd(8)} ${c.color}  ${c.isVisible ? '可见' : '隐藏'}${c.id === 'holidays' ? '（只读）' : ''}`)
   }
+}
+
+async function cmdDoctor(backend: Backend, json: boolean): Promise<void> {
+  const calendars = await backend.call<Calendar[]>('calendars.list')
+  const tasks = await backend.call<Task[]>('tasks.list', { filter: { status: 'all' } })
+  const events = await backend.call<CalendarEvent[]>('events.list', {})
+  const report = {
+    dataDir: getDataDir(),
+    database: getDbPath(),
+    databaseExists: existsSync(getDbPath()),
+    appRunning: probeApp() !== null,
+    calendars: calendars.length,
+    events: events.length,
+    tasks: tasks.length
+  }
+  if (json) return emitJson(report)
+  console.log(`数据目录: ${report.dataDir}`)
+  console.log(`数据库: ${report.database}（${report.databaseExists ? '存在' : '不存在'}）`)
+  console.log(`应用连接: ${report.appRunning ? '运行中（RPC）' : '未运行（离线模式）'}`)
+  console.log(`日历 ${report.calendars} · 日程 ${report.events} · 任务 ${report.tasks}`)
 }
 
 // ---------- 入口 ----------
@@ -611,6 +682,8 @@ async function main(): Promise<void> {
       return cmdSearch(backend, rest, json)
     case 'calendars':
       return cmdCalendars(backend, json)
+    case 'doctor':
+      return cmdDoctor(backend, json)
     case 'task': {
       const [sub, ...subRest] = rest
       switch (sub) {
@@ -619,13 +692,15 @@ async function main(): Promise<void> {
         case 'add':
           return cmdTaskAdd(backend, flags, subRest, json)
         case 'done':
-          return cmdTaskDone(backend, subRest[0], true, json)
+          return cmdTaskDone(backend, subRest, true, json)
+        case 'done-all':
+          return cmdTaskDoneAll(backend, flags, json)
         case 'undo':
-          return cmdTaskDone(backend, subRest[0], false, json)
+          return cmdTaskDone(backend, subRest, false, json)
         case 'update':
           return cmdTaskUpdate(backend, flags, subRest[0], json)
         case 'delete':
-          return cmdTaskDelete(backend, subRest[0], json)
+          return cmdTaskDelete(backend, subRest, json)
         default:
           throw new CliError(`未知子命令: task ${sub ?? ''}。用法: task list|add|done|undo|delete`)
       }

@@ -8,10 +8,12 @@ interface SettingsDialogProps {
   onRestore: () => Promise<string | null>
   onImportIcs: () => Promise<number>
   onOpenRecycleBin: () => void
+  notificationsEnabled: boolean
+  onNotificationsChange: (enabled: boolean) => void
   onClose: () => void
 }
 
-export default function SettingsDialog({ view, onViewChange, onOpenDataDir, onBackup, onRestore, onImportIcs, onOpenRecycleBin, onClose }: SettingsDialogProps) {
+export default function SettingsDialog({ view, onViewChange, onOpenDataDir, onBackup, onRestore, onImportIcs, onOpenRecycleBin, notificationsEnabled, onNotificationsChange, onClose }: SettingsDialogProps) {
   const run = async (action: () => Promise<unknown>) => {
     try { await action() } catch { /* 操作错误由主界面 toast 或系统对话框反馈 */ }
   }
@@ -26,6 +28,10 @@ export default function SettingsDialog({ view, onViewChange, onOpenDataDir, onBa
         <section className="settings-section">
           <div className="settings-section-title">默认视图</div>
           <label className="settings-field"><span>启动时显示</span><select value={view} onChange={(event) => onViewChange(event.target.value as ViewKind)}><option value="day">日视图</option><option value="4day">4 天视图</option><option value="week">周视图</option><option value="month">月视图</option><option value="year">年视图</option><option value="agenda">日程视图</option></select></label>
+        </section>
+        <section className="settings-section">
+          <div className="settings-section-title">通知</div>
+          <label className="settings-toggle"><input type="checkbox" checked={notificationsEnabled} onChange={(event) => onNotificationsChange(event.target.checked)} /><span>启用日程和任务提醒</span></label>
         </section>
         <section className="settings-section">
           <div className="settings-section-title">数据工具</div>
