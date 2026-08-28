@@ -30,4 +30,6 @@ Windows-only portable Electron calendar with local SQLite storage, tasks, remind
 
 - Run `npm run typecheck` and `npm run build` before handoff.
 - Preserve portable storage behavior.
+- Keep account editing under the avatar and appearance editing under the appearance menu.
+- Keep calendar editing in the sidebar row menus, not the general settings dialog.
 - Keep generated `release` and `portable-*` artifacts out of commits.

@@ -13,6 +13,8 @@ Repository: https://github.com/aoliaoduo/local-calendar
 - Tasks with due dates, reminders, editing, search, and calendar projection.
 - Local calendars, local profile, light/dark appearance, tray, printing, trash, ICS import/export, and backups.
 - Portable Windows packaging with app-local data.
+- Top-level settings menu follows the Google Calendar pattern: settings, recycle bin, appearance, and print.
+- Avatar opens a local profile card; appearance and calendar editing are separate from general settings.
 
 ## Next Recommended Work
 
@@ -20,6 +22,7 @@ Repository: https://github.com/aoliaoduo/local-calendar
 2. Add task list grouping and drag sorting.
 3. Add notification settings and startup behavior controls.
 4. Add end-to-end tests for recurrence, trash, reminders, and portable paths.
+5. Keep release artifacts out of Git; only the latest portable executable belongs in the release folder.
 
 ## Verification
 

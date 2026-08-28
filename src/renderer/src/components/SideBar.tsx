@@ -10,10 +10,12 @@ interface SideBarProps {
   onCreate: () => void
   onToggleCalendar: (id: string, visible: boolean) => void
   onCreateCalendar: (name: string, color: string) => Promise<void>
+  onEditCalendar: (calendar: CalendarInfo) => void
+  onDeleteCalendar: (calendar: CalendarInfo) => void
   collapsed: boolean
 }
 
-export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, onToggleCalendar, onCreateCalendar, collapsed }: SideBarProps) {
+export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, onToggleCalendar, onCreateCalendar, onEditCalendar, onDeleteCalendar, collapsed }: SideBarProps) {
   const [miniMonth, setMiniMonth] = useState(() => anchor.startOf('month'))
   const [showMyCals, setShowMyCals] = useState(true)
   const [showOtherCals, setShowOtherCals] = useState(true)
@@ -21,6 +23,7 @@ export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, o
   const [newCalendarName, setNewCalendarName] = useState('')
   const [newCalendarColor, setNewCalendarColor] = useState('#1a73e8')
   const [calendarError, setCalendarError] = useState('')
+  const [calendarMenuId, setCalendarMenuId] = useState<string | null>(null)
   const days = monthGrid(miniMonth)
   const today = DateTime.now()
 
@@ -32,19 +35,19 @@ export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, o
   const otherCals = calendars.filter((c) => c.id === 'holidays')
 
   const renderCalRow = (cal: CalendarInfo) => (
-    <button
-      type="button"
-      key={cal.id}
-      className={`cal-row${cal.isVisible ? '' : ' off'}`}
-      style={{ '--cal-c': cal.color } as React.CSSProperties}
-      title={cal.isVisible ? '点击隐藏该日历' : '点击显示该日历'}
-      onClick={() => onToggleCalendar(cal.id, !cal.isVisible)}
-    >
-      <span className="cal-check">
-        {cal.isVisible && <span className="material-icons">check</span>}
-      </span>
-      <span className="cal-name">{cal.name}</span>
-    </button>
+    <div className="cal-row-wrap" key={cal.id}>
+      <button type="button" className={`cal-row${cal.isVisible ? '' : ' off'}`} style={{ '--cal-c': cal.color } as React.CSSProperties} title={cal.isVisible ? '点击隐藏该日历' : '点击显示该日历'} onClick={() => onToggleCalendar(cal.id, !cal.isVisible)}>
+        <span className="cal-check">{cal.isVisible && <span className="material-icons">check</span>}</span>
+        <span className="cal-name">{cal.name}</span>
+      </button>
+      {cal.id !== 'personal' && <>
+        <button className="cal-row-more" title="日历选项" onClick={(event) => { event.stopPropagation(); setCalendarMenuId((id) => id === cal.id ? null : cal.id) }}><span className="material-icons">more_vert</span></button>
+        {calendarMenuId === cal.id && <div className="cal-row-menu">
+          <button onClick={() => { setCalendarMenuId(null); onEditCalendar(cal) }}>编辑日历</button>
+          <button className="danger" onClick={() => { setCalendarMenuId(null); onDeleteCalendar(cal) }}>删除日历</button>
+        </div>}
+      </>}
+    </div>
   )
 
   return (

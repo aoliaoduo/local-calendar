@@ -14,6 +14,7 @@ import HelpDialog from './components/HelpDialog'
 import RecycleBinDialog from './components/RecycleBinDialog'
 import AppearanceDialog from './components/AppearanceDialog'
 import ProfileDialog from './components/ProfileDialog'
+import CalendarEditDialog from './components/CalendarEditDialog'
 import { api, type CalendarInfo, type EventInfo, type TaskInfo } from './api'
 import { weekDates } from './dateUtils'
 
@@ -33,6 +34,7 @@ export default function App() {
   const [recycleOpen, setRecycleOpen] = useState(false)
   const [appearanceOpen, setAppearanceOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [calendarToEdit, setCalendarToEdit] = useState<CalendarInfo | null>(null)
   const [username, setUsername] = useState(() => localStorage.getItem('local-calendar.username') || '本地用户')
   const [avatarColor, setAvatarColor] = useState(() => localStorage.getItem('local-calendar.avatar-color') || '#4285f4')
   const [avatarImage, setAvatarImage] = useState<string | null>(() => localStorage.getItem('local-calendar.avatar-image'))
@@ -297,6 +299,8 @@ export default function App() {
           }
           onToggleCalendar={handleToggleCalendar}
           onCreateCalendar={handleCalendarCreate}
+          onEditCalendar={setCalendarToEdit}
+          onDeleteCalendar={(calendar) => { void handleCalendarDelete(calendar.id) }}
           collapsed={!sidebarOpen}
         />
 
@@ -345,24 +349,13 @@ export default function App() {
 
       {settingsOpen && (
         <SettingsDialog
-          calendars={calendars}
           view={view}
-          theme={theme}
           onViewChange={setPreferredView}
-          onThemeChange={setTheme}
-          onCalendarCreate={handleCalendarCreate}
-          onCalendarUpdate={handleCalendarUpdate}
-          onCalendarDelete={handleCalendarDelete}
           onOpenDataDir={handleOpenDataDir}
           onBackup={handleBackup}
           onRestore={handleRestore}
           onImportIcs={handleImportIcs}
           onOpenRecycleBin={() => setRecycleOpen(true)}
-          username={username}
-          avatarColor={avatarColor}
-          onProfileChange={updateProfile}
-          avatarImage={avatarImage}
-          onAvatarImageChange={updateAvatarImage}
           onClose={() => setSettingsOpen(false)}
         />
       )}
@@ -371,6 +364,7 @@ export default function App() {
       {recycleOpen && <RecycleBinDialog onClose={() => setRecycleOpen(false)} onToast={setToast} />}
       {appearanceOpen && <AppearanceDialog theme={theme} onThemeChange={setTheme} onClose={() => setAppearanceOpen(false)} />}
       {profileOpen && <ProfileDialog username={username} avatarColor={avatarColor} avatarImage={avatarImage} onEdit={() => setSettingsOpen(true)} onClose={() => setProfileOpen(false)} />}
+      {calendarToEdit && <CalendarEditDialog calendar={calendarToEdit} onSave={(patch) => handleCalendarUpdate(calendarToEdit.id, patch)} onClose={() => setCalendarToEdit(null)} />}
 
       {agendaDay && (
         <DayAgendaDialog
