@@ -1384,3 +1384,37 @@ select {
 :root[data-theme='dark'] .find-people:hover {
   background: #172131;
 }
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+:root[data-theme='dark'] .settings-menu,
+:root[data-theme='dark'] .search-panel,
+:root[data-theme='dark'] .view-menu,
+:root[data-theme='dark'] .cal-row-menu,
+:root[data-theme='dark'] .dlg,
+:root[data-theme='dark'] .settings-dialog,
+:root[data-theme='dark'] .calendar-edit-dialog {
+  background: #101722;
+  color: var(--text-1);
+}
+
+:root[data-theme='dark'] input:not([type='color']),
+:root[data-theme='dark'] textarea,
+:root[data-theme='dark'] select {
+  color-scheme: dark;
+  background-color: #101722;
+  color: var(--text-1);
+}
+
+:root[data-theme='dark'] input[type='checkbox'],
+:root[data-theme='dark'] input[type='radio'] {
+  accent-color: var(--g-blue);
+}
+
+:root[data-theme='dark'] .cal-row,
+:root[data-theme='dark'] .cal-row-wrap,
+:root[data-theme='dark'] .cal-row-more {
+  box-shadow: none;
+}

@@ -1738,6 +1738,7 @@
 
 /* Views are declared after the shared dark selector, so keep their surfaces here too. */
 :root[data-theme='dark'] .wk,
+:root[data-theme='dark'] .dlg,
 :root[data-theme='dark'] .wk-head,
 :root[data-theme='dark'] .wk-scroll,
 :root[data-theme='dark'] .day-agenda-dialog,
