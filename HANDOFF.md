@@ -2,7 +2,7 @@
 
 ## Current Release
 
-The current source and public repository use semantic version `1.9.0`.
+The current source and public repository use semantic version `1.9.1`.
 
 Repository: https://github.com/aoliaoduo/local-calendar
 
