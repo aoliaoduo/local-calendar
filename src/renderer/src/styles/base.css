@@ -924,6 +924,9 @@ select {
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
+  border-radius: 4px;
+  transition: background-color 0.16s ease, transform 0.16s ease;
 }
 
 .cal-row-wrap .cal-row {
@@ -1022,6 +1025,11 @@ select {
 }
 
 .cal-row:hover {
+  background: transparent;
+  transform: none;
+}
+
+.cal-row-wrap:hover {
   background: var(--hover);
   transform: translateX(2px);
 }
