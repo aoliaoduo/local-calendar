@@ -697,6 +697,34 @@
   padding: 8px 18px;
 }
 
+.recycle-empty {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-3);
+  text-align: center;
+}
+
+.recycle-empty .material-icons {
+  width: 58px;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--blue-soft);
+  color: var(--g-blue);
+  font-size: 30px;
+}
+
+.recycle-empty small {
+  color: var(--text-4);
+  font-size: 12px;
+}
+
 .recycle-item {
   display: flex;
   align-items: center;
