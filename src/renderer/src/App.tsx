@@ -7,6 +7,7 @@ import MonthView from './components/MonthView'
 import EventDialog, { type DialogState } from './components/EventDialog'
 import TasksPanel from './components/TasksPanel'
 import SettingsDialog from './components/SettingsDialog'
+import DayAgendaDialog from './components/DayAgendaDialog'
 import { api, type CalendarInfo, type EventInfo } from './api'
 import { weekDates } from './dateUtils'
 
@@ -20,6 +21,7 @@ export default function App() {
   const [dialog, setDialog] = useState<DialogState>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [agendaDay, setAgendaDay] = useState<DateTime | null>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('local-calendar.theme') as 'light' | 'dark') || 'light')
 
   const loadCalendars = useCallback(async () => {
@@ -225,6 +227,7 @@ export default function App() {
             calendars={calendars}
             onEventClick={openEvent}
             onDayClick={(d) => setDialog({ mode: 'create', day: d, allDay: true })}
+            onDayDetails={setAgendaDay}
             onEventMove={handleEventMove}
           />
         ) : (
@@ -270,6 +273,16 @@ export default function App() {
           onRestore={handleRestore}
           onImportIcs={handleImportIcs}
           onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {agendaDay && (
+        <DayAgendaDialog
+          day={agendaDay}
+          events={events}
+          calendars={calendars}
+          onClose={() => setAgendaDay(null)}
+          onEventClick={openEvent}
         />
       )}
 

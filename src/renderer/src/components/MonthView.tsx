@@ -10,10 +10,11 @@ interface MonthViewProps {
   calendars: CalendarInfo[]
   onEventClick: (event: EventInfo) => void
   onDayClick: (day: DateTime) => void
+  onDayDetails: (day: DateTime) => void
   onEventMove: (id: string, start: DateTime, end: DateTime) => void
 }
 
-export default function MonthView({ anchor, events, calendars, onEventClick, onDayClick, onEventMove }: MonthViewProps) {
+export default function MonthView({ anchor, events, calendars, onEventClick, onDayClick, onDayDetails, onEventMove }: MonthViewProps) {
   const days = useMemo(() => monthGrid(anchor), [anchor.toISODate()])
   const calById = useMemo(() => new Map(calendars.map((c) => [c.id, c])), [calendars])
   const today = DateTime.now()
@@ -156,7 +157,7 @@ export default function MonthView({ anchor, events, calendars, onEventClick, onD
                   className="mo-more"
                   onClick={(e) => {
                     e.stopPropagation()
-                    onDayClick(d)
+                    onDayDetails(d)
                   }}
                 >
                   还有 {more} 项

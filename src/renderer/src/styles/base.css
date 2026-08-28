@@ -61,6 +61,7 @@ button {
   background: none;
   cursor: pointer;
   color: inherit;
+  transition: background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
 }
 
 input,
@@ -113,6 +114,7 @@ select {
 :root[data-theme='dark'] .wk-head,
 :root[data-theme='dark'] .wk-scroll,
 :root[data-theme='dark'] .dlg,
+:root[data-theme='dark'] .day-agenda-dialog,
 :root[data-theme='dark'] .settings-dialog,
 :root[data-theme='dark'] .search-panel,
 :root[data-theme='dark'] .view-menu,
@@ -194,6 +196,7 @@ select {
 
 .icon-btn:hover {
   background: var(--hover);
+  transform: translateY(-1px);
 }
 
 .logo-block {
@@ -749,6 +752,7 @@ select {
   background: var(--surface);
   position: relative;
   padding: 0 10px 16px 0;
+  transition: padding 0.2s ease;
 }
 
 .content.with-tasks {

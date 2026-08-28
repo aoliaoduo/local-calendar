@@ -76,7 +76,7 @@ export default function TopBar({
   }
 
   return (
-    <header className="topbar">
+    <header className="topbar" onContextMenu={(event) => event.preventDefault()}>
       <div className="window-drag-region" />
       <button className="icon-btn" title="主菜单" onClick={onToggleSidebar}>
         <span className="material-icons">menu</span>
@@ -217,7 +217,6 @@ export default function TopBar({
           </button>
         </div>
 
-        <button className="upgrade-btn" onClick={() => onToast('本地版日历的全部功能均可免费使用。')}>升级</button>
         <button className="icon-btn" title="应用信息" onClick={() => onToast('本地日历 · 数据仅保存在此电脑。')}>
           <span className="material-icons">apps</span>
         </button>

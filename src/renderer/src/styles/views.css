@@ -7,6 +7,7 @@
   overflow: hidden;
   background: #fff;
   border-radius: 24px;
+  animation: view-enter 0.22s ease-out;
 }
 
 .wk-head {
@@ -308,6 +309,18 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  animation: view-enter 0.22s ease-out;
+}
+
+@keyframes view-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .mo-head {
@@ -443,6 +456,117 @@
 
 .mo-more:hover {
   background: var(--hover);
+}
+
+.day-agenda-dialog {
+  width: min(480px, calc(100vw - 32px));
+  max-height: min(680px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 24px 38px 3px rgba(0, 0, 0, 0.14), 0 9px 46px 8px rgba(0, 0, 0, 0.12);
+  animation: dialog-enter 0.18s ease-out;
+}
+
+.day-agenda-head,
+.day-agenda-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  flex-shrink: 0;
+}
+
+.day-agenda-head {
+  border-bottom: 1px solid var(--divider);
+}
+
+.day-agenda-title {
+  font-size: 20px;
+  color: var(--text-1);
+}
+
+.day-agenda-sub {
+  margin-top: 3px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.day-agenda-list {
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.day-agenda-item {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.day-agenda-item:hover {
+  background: var(--hover);
+}
+
+.day-agenda-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+
+.day-agenda-item-body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.day-agenda-item-title {
+  color: var(--text-1);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.day-agenda-item-time,
+.day-agenda-item-location {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.day-agenda-arrow {
+  margin-top: 3px;
+  font-size: 18px;
+  color: var(--text-4);
+}
+
+.day-agenda-empty {
+  padding: 40px 12px;
+  color: var(--text-3);
+  text-align: center;
+}
+
+.day-agenda-foot {
+  border-top: 1px solid var(--divider);
+  justify-content: flex-end;
+}
+
+@keyframes dialog-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.98) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 /* ---------- 弹窗 ---------- */

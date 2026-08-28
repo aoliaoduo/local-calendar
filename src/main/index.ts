@@ -136,6 +136,7 @@ function createWindow(): void {
     height: Math.min(860, workArea.height),
     minWidth: 1024,
     minHeight: 680,
+    center: true,
     backgroundColor: '#ffffff',
     autoHideMenuBar: true,
     frame: false,
@@ -154,7 +155,10 @@ function createWindow(): void {
     event.preventDefault()
     win.hide()
   })
-  win.on('ready-to-show', () => win.show())
+  win.on('ready-to-show', () => {
+    win.maximize()
+    win.show()
+  })
   if (process.env.ELECTRON_RENDERER_URL) {
     void win.loadURL(process.env.ELECTRON_RENDERER_URL)
   } else {
