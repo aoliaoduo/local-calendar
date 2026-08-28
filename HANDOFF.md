@@ -2,7 +2,7 @@
 
 ## Current Release
 
-The current source and public repository use semantic version `1.9.1`.
+The current source and public repository use semantic version `2.0.0`.
 
 Repository: https://github.com/aoliaoduo/local-calendar
 
@@ -17,6 +17,7 @@ Repository: https://github.com/aoliaoduo/local-calendar
 - Avatar opens a local profile card; appearance and calendar editing are separate from general settings.
 - PowerShell CLI is exposed through the package `bin/localcal.cmd` shim.
 - CLI also resolves its package directory from `process.argv[1]`, so the generated PowerShell shim works from any current directory.
+- Tasks with due dates are projected into calendar views and can be edited or moved from the calendar.
 
 ## Next Recommended Work
 

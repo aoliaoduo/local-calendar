@@ -1100,6 +1100,36 @@ select {
   font-size: 12px;
 }
 
+.settings-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.settings-tool {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  color: var(--text-2);
+  text-align: left;
+}
+
+.settings-tool:hover {
+  border-color: var(--g-blue);
+  background: var(--blue-soft);
+}
+
+.settings-tool .material-icons {
+  width: 22px;
+  font-size: 20px;
+  color: var(--g-blue);
+  text-align: center;
+}
+
 .settings-calendar-row {
   min-height: 42px;
   gap: 10px;

@@ -15,6 +15,7 @@ import RecycleBinDialog from './components/RecycleBinDialog'
 import AppearanceDialog from './components/AppearanceDialog'
 import ProfileDialog from './components/ProfileDialog'
 import CalendarEditDialog from './components/CalendarEditDialog'
+import TaskDialog from './components/TaskDialog'
 import { api, type CalendarInfo, type EventInfo, type TaskInfo } from './api'
 import { weekDates } from './dateUtils'
 
@@ -35,6 +36,7 @@ export default function App() {
   const [appearanceOpen, setAppearanceOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [calendarToEdit, setCalendarToEdit] = useState<CalendarInfo | null>(null)
+  const [taskToEdit, setTaskToEdit] = useState<TaskInfo | null>(null)
   const [username, setUsername] = useState(() => localStorage.getItem('local-calendar.username') || '本地用户')
   const [avatarColor, setAvatarColor] = useState(() => localStorage.getItem('local-calendar.avatar-color') || '#4285f4')
   const [avatarImage, setAvatarImage] = useState<string | null>(() => localStorage.getItem('local-calendar.avatar-image'))
@@ -181,7 +183,8 @@ export default function App() {
 
   const openEvent = (evt: EventInfo) => {
     if (evt.calendarId === 'tasks') {
-      setToast('任务请在右侧任务面板中编辑')
+      const task = tasks.find((item) => `task-${item.id}` === evt.id)
+      if (task) setTaskToEdit(task)
       return
     }
     if (evt.calendarId === 'holidays') {
@@ -199,7 +202,10 @@ export default function App() {
 
   const handleEventMove = async (id: string, start: DateTime, end: DateTime) => {
     if (id.startsWith('task-')) {
-      setToast('任务请在任务面板中修改截止日期')
+      const task = tasks.find((item) => `task-${item.id}` === id)
+      if (task) {
+        void api.updateTask(task.id, { dueAt: start.toISODate() }).then(() => { void loadTasks(); setToast('已更新任务截止日期') }).catch((err) => setToast(err instanceof Error ? err.message : '更新任务失败'))
+      }
       return
     }
     try {
@@ -365,6 +371,7 @@ export default function App() {
       {appearanceOpen && <AppearanceDialog theme={theme} onThemeChange={setTheme} onClose={() => setAppearanceOpen(false)} />}
       {profileOpen && <ProfileDialog username={username} avatarColor={avatarColor} avatarImage={avatarImage} onEdit={() => setSettingsOpen(true)} onClose={() => setProfileOpen(false)} />}
       {calendarToEdit && <CalendarEditDialog calendar={calendarToEdit} onSave={(patch) => handleCalendarUpdate(calendarToEdit.id, patch)} onClose={() => setCalendarToEdit(null)} />}
+      {taskToEdit && <TaskDialog task={taskToEdit} onClose={() => setTaskToEdit(null)} onSaved={(message) => { setTaskToEdit(null); setToast(message); void loadTasks() }} />}
 
       {agendaDay && (
         <DayAgendaDialog
