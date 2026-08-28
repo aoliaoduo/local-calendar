@@ -1359,3 +1359,28 @@ select {
     opacity: 1;
   }
 }
+
+/* Keep late-declared surfaces in sync with the dark palette. */
+:root[data-theme='dark'] .search-panel,
+:root[data-theme='dark'] .view-menu,
+:root[data-theme='dark'] .cal-row-menu,
+:root[data-theme='dark'] .create-btn,
+:root[data-theme='dark'] .settings-field select,
+:root[data-theme='dark'] .settings-create-calendar input,
+:root[data-theme='dark'] .settings-calendar-row input {
+  background: #101722;
+  color: var(--text-1);
+}
+
+:root[data-theme='dark'] .search-item:hover,
+:root[data-theme='dark'] .create-btn:hover {
+  background: var(--hover);
+}
+
+:root[data-theme='dark'] .find-people {
+  background: #101722;
+}
+
+:root[data-theme='dark'] .find-people:hover {
+  background: #172131;
+}

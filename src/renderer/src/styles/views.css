@@ -1736,6 +1736,30 @@
   .tasks-panel { width: 250px; margin-right: 6px; }
 }
 
+/* Views are declared after the shared dark selector, so keep their surfaces here too. */
+:root[data-theme='dark'] .wk,
+:root[data-theme='dark'] .wk-head,
+:root[data-theme='dark'] .wk-scroll,
+:root[data-theme='dark'] .day-agenda-dialog,
+:root[data-theme='dark'] .year-month,
+:root[data-theme='dark'] .recycle-dialog,
+:root[data-theme='dark'] .help-dialog,
+:root[data-theme='dark'] .appearance-dialog,
+:root[data-theme='dark'] .profile-dialog,
+:root[data-theme='dark'] .calendar-edit-dialog,
+:root[data-theme='dark'] .task-dialog,
+:root[data-theme='dark'] .tasks-panel,
+:root[data-theme='dark'] .tasks-more-menu {
+  background: #101722;
+}
+
+:root[data-theme='dark'] .wk-allday,
+:root[data-theme='dark'] .mo-grid,
+:root[data-theme='dark'] .day-agenda-head,
+:root[data-theme='dark'] .day-agenda-foot {
+  background: #101722;
+}
+
 .tasks-done-toggle .material-icons {
   font-size: 18px;
 }
