@@ -535,6 +535,7 @@ select {
   opacity: 1;
   transform: translateX(0);
   transition: width 0.24s cubic-bezier(0.2, 0, 0, 1), opacity 0.18s ease, transform 0.24s cubic-bezier(0.2, 0, 0, 1), padding 0.24s ease;
+  min-width: 0;
 }
 
 .sidebar.hidden {
@@ -543,6 +544,8 @@ select {
 
 .sidebar.collapsed {
   width: 0;
+  min-width: 0;
+  max-width: 0;
   padding-left: 0;
   padding-right: 0;
   opacity: 0;
