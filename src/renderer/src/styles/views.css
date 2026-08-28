@@ -820,6 +820,52 @@
   min-width: 0;
 }
 
+.task-edit-form {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.task-edit-form input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--divider);
+  padding: 4px 0;
+  background: transparent;
+  color: var(--text-1);
+}
+
+.task-edit-form input:focus {
+  border-bottom: 2px solid var(--g-blue);
+  padding-bottom: 3px;
+}
+
+.task-edit {
+  opacity: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.task-item:hover .task-edit,
+.task-edit:focus {
+  opacity: 1;
+}
+
+.task-edit:hover {
+  background: var(--hover);
+}
+
+.task-edit .material-icons {
+  font-size: 17px;
+}
+
 .task-title {
   font-size: 14px;
   color: var(--text-1);

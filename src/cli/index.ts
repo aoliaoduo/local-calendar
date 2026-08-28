@@ -28,6 +28,7 @@ const HELP = `本地日历 CLI — 操作 Local Calendar 的日程与待办
 待办:
   task list [--all | --done]          列出待办（默认未完成）
   task add <标题> [-d 截止日期] [-n 备注]
+  task update <id> [--title 标题] [-d 截止日期] [-n 备注]
   task done <id>                      标记完成
   task undo <id>                      重新打开
   task delete <id>                    删除待办
@@ -396,6 +397,23 @@ async function cmdTaskDone(
   console.log(completed ? `已完成: ${task.title}` : `已重新打开: ${task.title}`)
 }
 
+async function cmdTaskUpdate(
+  backend: Backend,
+  flags: Record<string, string | true>,
+  idPrefix: string | undefined,
+  json: boolean
+): Promise<void> {
+  const target = await resolveTask(backend, idPrefix)
+  const patch: Record<string, unknown> = {}
+  if (str(flags, 'title')) patch.title = str(flags, 'title')
+  if (flags.due !== undefined) patch.dueAt = str(flags, 'due') ?? null
+  if (flags.note !== undefined) patch.notes = str(flags, 'note') ?? null
+  if (!Object.keys(patch).length) throw new CliError('没有要修改的字段（--title / -d / -n）')
+  const task = await backend.call<Task>('tasks.update', { id: target.id, patch })
+  if (json) return emitJson(task)
+  console.log(`已更新待办 → ${fmtTaskLine(task)}`)
+}
+
 async function cmdTaskDelete(backend: Backend, idPrefix: string | undefined, json: boolean): Promise<void> {
   const target = await resolveTask(backend, idPrefix)
   const ok = await backend.call<boolean>('tasks.delete', { id: target.id })
@@ -454,6 +472,8 @@ async function main(): Promise<void> {
           return cmdTaskDone(backend, subRest[0], true, json)
         case 'undo':
           return cmdTaskDone(backend, subRest[0], false, json)
+        case 'update':
+          return cmdTaskUpdate(backend, flags, subRest[0], json)
         case 'delete':
           return cmdTaskDelete(backend, subRest[0], json)
         default:

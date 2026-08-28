@@ -13,6 +13,10 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const [newTitle, setNewTitle] = useState('')
   const [newDue, setNewDue] = useState('')
   const [showDone, setShowDone] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDue, setEditDue] = useState('')
+  const [editNotes, setEditNotes] = useState('')
 
   const load = async () => {
     setTasks(await api.listTasks('all'))
@@ -35,6 +39,25 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
     void load()
   }
 
+  const startEdit = (task: TaskInfo) => {
+    setEditingId(task.id)
+    setEditTitle(task.title)
+    setEditDue(task.dueAt ? DateTime.fromISO(task.dueAt).toLocal().toFormat('yyyy-MM-dd') : '')
+    setEditNotes(task.notes ?? '')
+  }
+
+  const saveEdit = async () => {
+    if (!editingId || !editTitle.trim()) return
+    try {
+      await api.updateTask(editingId, { title: editTitle.trim(), dueAt: editDue || null, notes: editNotes.trim() || null })
+      setEditingId(null)
+      onToast('已更新任务')
+      await load()
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : '更新任务失败')
+    }
+  }
+
   const open = tasks.filter((t) => t.status === 'needsAction')
   const done = tasks.filter((t) => t.status === 'completed')
   const todayStr = DateTime.now().toISODate()
@@ -53,16 +76,33 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
         >
           {t.status === 'completed' && <span className="material-icons">check</span>}
         </button>
-        <div className="task-body">
-          <div className={`task-title${t.status === 'completed' ? ' done' : ''}`}>{t.title}</div>
-          {dueDate && (
-            <div className={`task-due${overdue ? ' overdue' : ''}`}>
-              <span className="material-icons">calendar_today</span>
-              {dueDate.toFormat('M月d日')}
+        {editingId === t.id ? (
+          <div className="task-edit-form">
+            <input autoFocus value={editTitle} onChange={(event) => setEditTitle(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void saveEdit(); if (event.key === 'Escape') setEditingId(null) }} />
+            <input type="date" value={editDue} onChange={(event) => setEditDue(event.target.value)} />
+            <input placeholder="备注（可选）" value={editNotes} onChange={(event) => setEditNotes(event.target.value)} />
+            <div className="task-add-actions">
+              <button className="btn-text compact" onClick={() => void saveEdit()}>保存</button>
+              <button className="btn-text compact" onClick={() => setEditingId(null)}>取消</button>
             </div>
-          )}
-          {t.notes && <div className="task-notes">{t.notes}</div>}
-        </div>
+          </div>
+        ) : (
+          <div className="task-body" onDoubleClick={() => startEdit(t)}>
+            <div className={`task-title${t.status === 'completed' ? ' done' : ''}`}>{t.title}</div>
+            {dueDate && (
+              <div className={`task-due${overdue ? ' overdue' : ''}`}>
+                <span className="material-icons">calendar_today</span>
+                {dueDate.toFormat('M月d日')}
+              </div>
+            )}
+            {t.notes && <div className="task-notes">{t.notes}</div>}
+          </div>
+        )}
+        {editingId !== t.id && (
+          <button className="task-edit" title="编辑" onClick={() => startEdit(t)}>
+            <span className="material-icons">edit</span>
+          </button>
+        )}
         <button
           className="task-del"
           title="删除"
