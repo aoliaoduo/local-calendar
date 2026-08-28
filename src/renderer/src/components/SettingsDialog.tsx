@@ -105,6 +105,14 @@ export default function SettingsDialog({
     }
   }
 
+  const deleteCalendar = async (id: string) => {
+    try {
+      await onCalendarDelete(id)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '删除日历失败')
+    }
+  }
+
   return (
     <div className="dlg-mask" onMouseDown={onClose}>
       <div className="settings-dialog" onMouseDown={(event) => event.stopPropagation()}>
@@ -164,7 +172,7 @@ export default function SettingsDialog({
                     <button className="icon-btn small" title="重命名" onClick={() => { setEditingId(calendar.id); setEditingName(calendar.name) }}>
                       <span className="material-icons">edit</span>
                     </button>
-                    <button className="icon-btn small" title="删除" onClick={() => void onCalendarDelete(calendar.id)}>
+                    <button className="icon-btn small" title="删除" onClick={() => void deleteCalendar(calendar.id)}>
                       <span className="material-icons">delete_outline</span>
                     </button>
                   </>

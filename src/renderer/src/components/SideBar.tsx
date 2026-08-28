@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { DateTime } from 'luxon'
 import { monthGrid, sameDay, WEEKDAYS_SHORT } from '../dateUtils'
 import type { CalendarInfo } from '../api'
@@ -18,6 +18,10 @@ export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, o
   const [showOtherCals, setShowOtherCals] = useState(true)
   const days = monthGrid(miniMonth)
   const today = DateTime.now()
+
+  useEffect(() => {
+    if (miniMonth.year !== anchor.year || miniMonth.month !== anchor.month) setMiniMonth(anchor.startOf('month'))
+  }, [anchor, miniMonth.year, miniMonth.month])
 
   const myCals = calendars.filter((c) => !['holidays'].includes(c.id))
   const otherCals = calendars.filter((c) => c.id === 'holidays')

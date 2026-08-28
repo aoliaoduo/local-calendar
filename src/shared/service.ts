@@ -121,7 +121,7 @@ function expandRecurring(evt: CalendarEvent, from: DateTime, to: DateTime): Cale
     if (rule.count !== null && idx >= rule.count) break
     if (rule.until && occ > rule.until) break
     if (occ > to) break
-    if (evt.exdates.includes(occ.toUTC().toISO()!)) {
+    if ((evt.exdates ?? []).includes(occ.toUTC().toISO()!)) {
       idx++
       continue
     }
@@ -502,8 +502,7 @@ export class CalendarService {
     if (!event) throw new Error(`日程不存在: ${id}`)
     const occurrence = recurringOccurrence(event, occurrenceIndex)
     if (!occurrence) throw new Error('重复日程实例不存在')
-    this.deleteEventOccurrence(id, occurrenceIndex)
-    return this.createEvent({
+    const standalone = this.createEvent({
       title: patch.title ?? event.title,
       description: patch.description !== undefined ? patch.description ?? undefined : event.description ?? undefined,
       location: patch.location !== undefined ? patch.location ?? undefined : event.location ?? undefined,
@@ -515,6 +514,13 @@ export class CalendarService {
       reminders: patch.reminders ?? event.reminders,
       rrule: null
     })
+    try {
+      this.deleteEventOccurrence(id, occurrenceIndex)
+    } catch (error) {
+      this.deleteEvent(standalone.id)
+      throw error
+    }
+    return standalone
   }
 
   deleteEvent(id: string): boolean {

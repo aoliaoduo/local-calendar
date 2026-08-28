@@ -146,10 +146,14 @@ export default function EventDialog({ state, calendars, onClose, onSaved }: Even
 
   const handleDelete = async () => {
     if (!editing) return
-    if (state.occurrenceIndex !== undefined && editScope === 'occurrence') await api.deleteEventOccurrence(existing!.id, state.occurrenceIndex)
-    else await api.deleteEvent(existing!.id)
-    onSaved('已删除日程')
-    onClose()
+    try {
+      if (state.occurrenceIndex !== undefined && editScope === 'occurrence') await api.deleteEventOccurrence(existing!.id, state.occurrenceIndex)
+      else await api.deleteEvent(existing!.id)
+      onSaved('已删除日程')
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '删除失败')
+    }
   }
 
   const toggleAllDay = (v: boolean) => {
