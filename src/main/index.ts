@@ -191,8 +191,9 @@ function createWindow(): void {
     win.hide()
   })
   win.on('system-context-menu', (event) => event.preventDefault())
-  win.webContents.on('before-input-event', (_event, input) => {
-    if (input.type === 'mouseDown' && (input as Electron.Input & { y?: number }).y !== undefined && (input as Electron.Input & { y?: number }).y! < 68) {
+  win.webContents.on('input-event', (_event, input) => {
+    const y = (input as { y?: unknown }).y
+    if (input.type === 'mouseDown' && typeof y === 'number' && y < 68) {
       win.webContents.send('titlebar-pointerdown')
     }
   })
