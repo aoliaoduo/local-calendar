@@ -26,7 +26,6 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const [editTitle, setEditTitle] = useState('')
   const [editDue, setEditDue] = useState('')
   const [editNotes, setEditNotes] = useState('')
-  const moreRef = useRef<HTMLDivElement>(null)
   const [editReminder, setEditReminder] = useState('')
   const [editPriority, setEditPriority] = useState('0')
   const [dragId, setDragId] = useState<string | null>(null)
@@ -36,6 +35,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const taskAddRef = useRef<HTMLDivElement>(null)
   const sortRef = useRef<HTMLDivElement>(null)
+  const moreMenuRef = useRef<HTMLDivElement>(null)
   const [editRrule, setEditRrule] = useState('')
 
   const load = async () => {
@@ -51,7 +51,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   useEffect(() => {
     if (!moreOpen) return
     const close = (event: PointerEvent) => {
-      if (!moreRef.current?.contains(event.target as Node)) setMoreOpen(false)
+      if (!moreMenuRef.current?.contains(event.target as Node)) setMoreOpen(false)
     }
     document.addEventListener('pointerdown', close)
     return () => document.removeEventListener('pointerdown', close)
@@ -287,17 +287,15 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
 
   return (
     <aside className="tasks-panel">
-      <div className="tasks-head" ref={moreRef}>
-        <button className="icon-btn" title="关闭" onClick={onClose}>
-          <span className="material-icons">close</span>
-        </button>
-        <span className="tasks-title">我的任务</span>
-        <button className="icon-btn" title="搜索任务" onClick={() => setSearchOpen(true)}>
-          <span className="material-icons">search</span>
-        </button>
-        <button className="icon-btn" title="更多" onClick={() => setMoreOpen((value) => !value)}>
-          <span className="material-icons">more_vert</span>
-        </button>
+      <div className="tasks-head">
+        <div className="tasks-heading">
+          <span className="tasks-eyebrow">TASKS</span>
+          <button className="tasks-list-selector" title="任务列表"><span>我的任务</span><span className="material-icons">arrow_drop_down</span></button>
+        </div>
+        <div className="tasks-head-actions">
+          <button className="icon-btn" title="搜索任务" onClick={() => setSearchOpen(true)}><span className="material-icons">search</span></button>
+          <button className="icon-btn" title="关闭" onClick={onClose}><span className="material-icons">close</span></button>
+        </div>
         {moreOpen && (
           <div className="tasks-more-menu">
             <button onClick={() => { void Promise.all(done.map((task) => api.deleteTask(task.id))).then(() => { onToast('已清除已完成任务'); setMoreOpen(false); return load() }) }}>清除已完成任务</button>
@@ -307,15 +305,17 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
 
       <div className="tasks-list">
         {query || searchOpen ? <input autoFocus className="task-search" placeholder="搜索任务" value={query} onChange={(event) => setQuery(event.target.value)} onBlur={() => { if (!query) setSearchOpen(false) }} /> : null}
+        <div className="task-add-bar" ref={moreMenuRef}>
+          <button className="task-add-trigger" onClick={() => setAdding(true)}><span className="material-icons">add_task</span><span>添加任务</span></button>
+          <button className={`icon-btn task-more-button${moreOpen ? ' active' : ''}`} title="更多" onClick={() => setMoreOpen((value) => !value)}><span className="material-icons">more_vert</span></button>
+          {moreOpen && <div className="tasks-more-menu"><button onClick={() => { setMoreOpen(false); setSearchOpen(true) }}><span className="material-icons">search</span>搜索任务</button><button onClick={() => { setMoreOpen(false); setSortOpen((value) => !value) }}><span className="material-icons">sort</span>排序任务</button><button onClick={() => { void Promise.all(done.map((task) => api.deleteTask(task.id))).then(() => { onToast('已清除已完成任务'); setMoreOpen(false); return load() }) }}>清除已完成任务</button></div>}
+        </div>
         <div className="task-filters" role="tablist" aria-label="任务筛选">
           {([['all', '全部'], ['today', '今天'], ['overdue', '逾期'], ['scheduled', '有日期']] as const).map(([key, label]) => <button key={key} className={filter === key ? 'active' : ''} onClick={() => setFilter(key)}>{label}</button>)}
         </div>
-        <div className="task-sort-wrap" ref={sortRef}>
-          <button className={`icon-btn task-sort-button${sortOpen ? ' active' : ''}`} title="排序依据" onClick={() => setSortOpen((value) => !value)}><span className="material-icons">sort</span></button>
-          {sortOpen && <div className="task-sort-menu"><div className="task-sort-menu-title">排序依据</div>{([['manual', '我的顺序'], ['due', '日期'], ['priority', '优先级'], ['created', '最近创建']] as const).map(([key, label]) => <button key={key} className={sortMode === key ? 'active' : ''} onClick={() => { setSortMode(key); setSortOpen(false) }}>{sortMode === key && <span className="material-icons">check</span>}<span>{label}</span></button>)}</div>}
-        </div>
+        {sortOpen && <div className="task-sort-menu task-sort-menu-inline" ref={sortRef}><div className="task-sort-menu-title">排序依据</div>{([['manual', '我的顺序'], ['due', '日期'], ['priority', '优先级'], ['created', '最近创建']] as const).map(([key, label]) => <button key={key} className={sortMode === key ? 'active' : ''} onClick={() => { setSortMode(key); setSortOpen(false) }}>{sortMode === key && <span className="material-icons">check</span>}<span>{label}</span></button>)}</div>}
         {selected.size > 0 && <div className="task-bulk-bar"><span>已选 {selected.size}</span><button className="btn-text compact" onClick={() => void batchComplete()}>完成</button><button className="btn-text compact danger" onClick={() => void batchDelete()}>删除</button><button className="icon-btn compact" title="清除选择" onClick={() => setSelected(new Set())}><span className="material-icons">close</span></button></div>}
-        {adding ? (
+        {adding && (
           <div ref={taskAddRef} className="task-add-form">
             <span className="task-add-check" />
             <textarea
@@ -371,14 +371,10 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
               </button>
             </div>
           </div>
-        ) : (
-          <button className="task-add-btn" onClick={() => setAdding(true)}>
-            <span className="material-icons">add</span>
-            添加任务
-          </button>
         )}
 
         {groupTasks(sortedOpen).map((group) => <section className="task-group" key={group.key}><div className="task-group-label">{group.label}</div>{group.items.map(renderTask)}</section>)}
+        {groupTasks(sortedOpen).length === 0 && visibleDone.length === 0 && <div className="task-empty"><div className="task-empty-illustration"><span className="material-icons">task_alt</span></div><div className="task-empty-title">还没有任务</div><div className="task-empty-subtitle">添加待办事项，并在日历中跟踪它们</div></div>}
 
         {visibleDone.length > 0 && (
           <>
