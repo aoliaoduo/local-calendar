@@ -12,12 +12,17 @@ interface SettingsDialogProps {
   onOpenRecycleBin: () => void
   notificationsEnabled: boolean
   onNotificationsChange: (enabled: boolean) => void
+  onError: (message: string) => void
   onClose: () => void
 }
 
-export default function SettingsDialog({ view, onViewChange, weekStart, onWeekStartChange, onOpenDataDir, onBackup, onRestore, onImportIcs, onOpenRecycleBin, notificationsEnabled, onNotificationsChange, onClose }: SettingsDialogProps) {
+export default function SettingsDialog({ view, onViewChange, weekStart, onWeekStartChange, onOpenDataDir, onBackup, onRestore, onImportIcs, onOpenRecycleBin, notificationsEnabled, onNotificationsChange, onError, onClose }: SettingsDialogProps) {
   const run = async (action: () => Promise<unknown>) => {
-    try { await action() } catch { /* 操作错误由主界面 toast 或系统对话框反馈 */ }
+    try {
+      await action()
+    } catch (error) {
+      onError(error instanceof Error ? error.message : '操作失败')
+    }
   }
 
   return (

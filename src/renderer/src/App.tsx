@@ -179,16 +179,16 @@ export default function App() {
     localStorage.setItem('local-calendar.default-view', nextView)
   }
 
-  const saveProfile = (nextUsername: string, nextAvatarColor: string, nextAvatarImage: string | null) => {
+  const saveProfile = async (nextUsername: string, nextAvatarColor: string, nextAvatarImage: string | null) => {
     const normalizedName = nextUsername.trim() || '本地用户'
-    setUsername(normalizedName)
-    setAvatarColor(nextAvatarColor)
-    setAvatarImage(nextAvatarImage)
-    localStorage.setItem('local-calendar.username', normalizedName)
-    localStorage.setItem('local-calendar.avatar-color', nextAvatarColor)
-    if (nextAvatarImage) localStorage.setItem('local-calendar.avatar-image', nextAvatarImage)
+    const profile = await window.calendarApi.setProfile({ username: normalizedName, avatarColor: nextAvatarColor, avatarImage: nextAvatarImage })
+    setUsername(profile.username)
+    setAvatarColor(profile.avatarColor)
+    setAvatarImage(profile.avatarImage)
+    localStorage.setItem('local-calendar.username', profile.username)
+    localStorage.setItem('local-calendar.avatar-color', profile.avatarColor)
+    if (profile.avatarImage) localStorage.setItem('local-calendar.avatar-image', profile.avatarImage)
     else localStorage.removeItem('local-calendar.avatar-image')
-    void window.calendarApi.setProfile({ username: normalizedName, avatarColor: nextAvatarColor, avatarImage: nextAvatarImage })
   }
 
   const dismissTransient = () => {
@@ -379,7 +379,11 @@ export default function App() {
         onToast={setToast}
         onSettings={() => setSettingsOpen(true)}
         onHelp={() => setHelpOpen(true)}
-        onPrint={() => { void window.calendarApi.printCalendar().then((printed) => { if (!printed) setToast('打印已取消或失败') }) }}
+        onPrint={() => {
+          void window.calendarApi.printCalendar()
+            .then((printed) => { if (!printed) setToast('打印已取消或失败') })
+            .catch((error) => setToast(error instanceof Error ? error.message : '打印失败'))
+        }}
         onRecycle={() => setRecycleOpen(true)}
         onAppearance={() => setAppearanceOpen(true)}
         onAvatarClick={() => setProfileOpen(true)}
@@ -491,7 +495,15 @@ export default function App() {
           onImportIcs={handleImportIcs}
           onOpenRecycleBin={() => setRecycleOpen(true)}
           notificationsEnabled={notificationsEnabled}
-          onNotificationsChange={(enabled) => { setNotificationsEnabled(enabled); void window.calendarApi.setNotificationSettings(enabled) }}
+          onNotificationsChange={(enabled) => {
+            const previous = notificationsEnabled
+            setNotificationsEnabled(enabled)
+            void window.calendarApi.setNotificationSettings(enabled).catch((error) => {
+              setNotificationsEnabled(previous)
+              setToast(error instanceof Error ? error.message : '更新通知设置失败')
+            })
+          }}
+          onError={setToast}
           onClose={() => setSettingsOpen(false)}
         />
       )}
@@ -499,7 +511,7 @@ export default function App() {
       {helpOpen && <HelpDialog calendars={calendars} onClose={() => setHelpOpen(false)} />}
       {recycleOpen && <RecycleBinDialog onClose={() => setRecycleOpen(false)} onToast={setToast} />}
       {appearanceOpen && <AppearanceDialog theme={theme} onThemeChange={setTheme} onClose={() => setAppearanceOpen(false)} />}
-      {profileOpen && <ProfileDialog username={username} avatarColor={avatarColor} avatarImage={avatarImage} onSave={(name, color, image) => { saveProfile(name, color, image); setProfileOpen(false) }} onClose={() => setProfileOpen(false)} />}
+      {profileOpen && <ProfileDialog username={username} avatarColor={avatarColor} avatarImage={avatarImage} onSave={saveProfile} onClose={() => setProfileOpen(false)} />}
       {calendarToEdit && <CalendarEditDialog calendar={calendarToEdit} onSave={(patch) => handleCalendarUpdate(calendarToEdit.id, patch)} onClose={() => setCalendarToEdit(null)} />}
       {taskToEdit && <TaskDialog task={taskToEdit} occurrenceIndex={taskOccurrenceIndex} occurrenceDue={taskOccurrenceDue} onClose={() => { setTaskToEdit(null); setTaskOccurrenceIndex(undefined); setTaskOccurrenceDue(undefined) }} onSaved={(message) => { setTaskToEdit(null); setTaskOccurrenceIndex(undefined); setTaskOccurrenceDue(undefined); setToast(message); void loadTasks(); void loadTaskOccurrences() }} />}
 
