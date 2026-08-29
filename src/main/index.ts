@@ -145,6 +145,11 @@ let tray: Tray | null = null
 let isQuitting = false
 const MAX_RPC_BODY_BYTES = 1_000_000
 
+function publishDataChanged(method: string, windows: BrowserWindow[]): void {
+  refreshTray()
+  for (const win of windows) win.webContents.send('data-changed', { method })
+}
+
 function startRpcServer(getWindows: () => BrowserWindow[]): void {
   const token = randomBytes(24).toString('hex')
   rpcServer = createServer((req, res) => {
@@ -201,7 +206,7 @@ function startRpcServer(getWindows: () => BrowserWindow[]): void {
       params = (parsed.params as Record<string, unknown> | undefined) ?? {}
       const result = await dispatch(method, params)
       if (result.ok && mutating.has(method)) {
-        for (const win of getWindows()) win.webContents.send('data-changed', { method })
+        publishDataChanged(method, getWindows())
       }
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify(result))
@@ -299,6 +304,10 @@ function createTray(): void {
   tray.setToolTip('本地日历')
   tray.setContextMenu(buildTrayMenu())
   tray.on('double-click', () => BrowserWindow.getAllWindows()[0]?.show())
+}
+
+function refreshTray(): void {
+  if (tray) tray.setContextMenu(buildTrayMenu())
 }
 
 function buildTrayMenu(): Menu {
@@ -446,7 +455,7 @@ app.whenReady().then(() => {
   ipcMain.handle('rpc', async (_e, method: string, params: Record<string, unknown>) => {
     const result = await dispatch(method, params ?? {})
     if (result.ok && mutating.has(method)) {
-      for (const win of BrowserWindow.getAllWindows()) win.webContents.send('data-changed', { method })
+      publishDataChanged(method, BrowserWindow.getAllWindows())
     }
     return result
   })
@@ -521,7 +530,7 @@ app.whenReady().then(() => {
     })
     if (result.canceled || !result.filePaths[0]) return 0
     const count = importIcsFile(result.filePaths[0])
-    for (const win of BrowserWindow.getAllWindows()) win.webContents.send('data-changed', { method: 'events.import' })
+    publishDataChanged('events.import', BrowserWindow.getAllWindows())
     return count
   })
   ipcMain.handle('choose-avatar', async () => {
@@ -542,7 +551,7 @@ app.whenReady().then(() => {
   startRpcServer(() => BrowserWindow.getAllWindows())
   createWindow()
   createTray()
-  setInterval(() => tray?.setContextMenu(buildTrayMenu()), 60_000)
+  setInterval(refreshTray, 60_000)
   setInterval(checkReminders, 30_000)
   setInterval(() => void runAutoBackup(), 6 * 60 * 60 * 1000)
 
