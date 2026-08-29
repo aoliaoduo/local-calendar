@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, screen, shell, Tray, Notification } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, screen, shell, Notification } from 'electron'
 import { dirname, extname, join } from 'node:path'
 import { createServer, type Server } from 'node:http'
 import { randomBytes, randomUUID } from 'node:crypto'
@@ -10,6 +10,7 @@ import { getDbPath, getRpcInfoPath, getDataDir } from '../shared/paths'
 import type { Task } from '../shared/types'
 import { isReminderDue } from '../shared/reminders'
 import { parseIcsEvents } from '../shared/ics'
+import { createTrayManager } from './tray'
 import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync, rmSync, readdirSync, statSync, unlinkSync } from 'node:fs'
 
 const windowStatePath = () => join(getDataDir(), 'window-state.json')
@@ -114,6 +115,14 @@ if (!hasSingleInstanceLock) {
 }
 const svc = new CalendarService(openDatabase())
 const { methods, mutating } = createMethodTable(svc)
+let isQuitting = false
+const trayManager = createTrayManager(
+  svc,
+  getIconPath(),
+  () => BrowserWindow.getAllWindows()[0]?.show(),
+  focusTarget,
+  () => { isQuitting = true; app.quit() }
+)
 
 methods.set('debug.evaluate', async (p: Record<string, unknown>) => {
   const win = BrowserWindow.getAllWindows()[0]
@@ -156,12 +165,10 @@ async function dispatch(
 }
 
 let rpcServer: Server | null = null
-let tray: Tray | null = null
-let isQuitting = false
 const MAX_RPC_BODY_BYTES = 1_000_000
 
 function publishDataChanged(method: string, windows: BrowserWindow[]): void {
-  refreshTray()
+  trayManager.refresh()
   for (const win of windows) win.webContents.send('data-changed', { method })
 }
 
@@ -307,55 +314,6 @@ function focusTarget(kind: 'event' | 'task', id: string): void {
   setTimeout(() => {
     void win.webContents.executeJavaScript(`window.__openTarget && window.__openTarget(${JSON.stringify(kind)}, ${JSON.stringify(id)})`).catch(() => {})
   }, 120)
-}
-
-function createTray(): void {
-  if (tray) return
-  try {
-    tray = new Tray(getIconPath())
-  } catch {
-    return
-  }
-  tray.setToolTip('本地日历')
-  tray.setContextMenu(buildTrayMenu())
-  tray.on('double-click', () => BrowserWindow.getAllWindows()[0]?.show())
-}
-
-function refreshTray(): void {
-  if (tray) tray.setContextMenu(buildTrayMenu())
-}
-
-function buildTrayMenu(): Menu {
-  const today = DateTime.now().toISODate()!
-  let eventItems: Electron.MenuItemConstructorOptions[] = []
-  let taskItems: Electron.MenuItemConstructorOptions[] = []
-  let overdueItems: Electron.MenuItemConstructorOptions[] = []
-  try {
-    eventItems = svc.listEvents(today, today).slice(0, 8).map((event) => ({
-      label: `${event.isAllDay ? '全天' : DateTime.fromISO(event.startUtc).toLocal().toFormat('HH:mm')}  ${event.title}`,
-      click: () => focusTarget('event', event.id)
-    }))
-    taskItems = svc.listTaskOccurrences(today, today).filter((task) => task.status === 'needsAction').sort((a, b) => (a.dueAt || '').localeCompare(b.dueAt || '')).slice(0, 8).map((task) => ({
-      label: task.dueAt ? `${task.title}（${DateTime.fromISO(task.dueAt).toLocal().toFormat('M月d日')}）` : task.title,
-      click: () => focusTarget('task', task.id)
-    }))
-    overdueItems = svc.listTaskOccurrences(DateTime.now().minus({ years: 2 }).toFormat('yyyy-MM-dd'), today).filter((task) => task.status === 'needsAction' && task.dueAt && DateTime.fromISO(task.dueAt).toLocal().toISODate()! < today).sort((a, b) => (a.dueAt || '').localeCompare(b.dueAt || '')).slice(0, 8).map((task) => ({
-      label: task.dueAt ? `${task.title}（${DateTime.fromISO(task.dueAt).toLocal().toFormat('M月d日')}）` : task.title,
-      click: () => focusTarget('task', task.id)
-    }))
-  } catch {
-    eventItems = []
-    taskItems = []
-  }
-  return Menu.buildFromTemplate([
-    { label: '打开本地日历', click: () => BrowserWindow.getAllWindows()[0]?.show() },
-    { type: 'separator' },
-    { label: `已逾期任务（${overdueItems.length}）`, submenu: overdueItems.length ? overdueItems : [{ label: '没有逾期任务', enabled: false }] },
-    { label: `今日安排（${eventItems.length}）`, submenu: eventItems.length ? eventItems : [{ label: '今天没有日程', enabled: false }] },
-    { label: `未完成任务（${taskItems.length}）`, submenu: taskItems.length ? taskItems : [{ label: '没有未完成任务', enabled: false }] },
-    { type: 'separator' },
-    { label: '退出', click: () => { isQuitting = true; app.quit() } }
-  ])
 }
 
 function importIcsFile(path: string): number {
@@ -600,8 +558,8 @@ app.whenReady().then(() => {
 
   startRpcServer(() => BrowserWindow.getAllWindows())
   createWindow()
-  createTray()
-  setInterval(refreshTray, 60_000)
+  trayManager.create()
+  setInterval(trayManager.refresh, 60_000)
   setInterval(checkReminders, 30_000)
   setInterval(() => void runAutoBackup(), 6 * 60 * 60 * 1000)
 

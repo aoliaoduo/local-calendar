@@ -1,12 +1,13 @@
 import { readFileSync, existsSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, resolve } from 'node:path'
 import { DateTime } from 'luxon'
-import { getDataDir, getDbPath, getRpcInfoPath, type RpcInfo } from '../shared/paths'
-import { openDatabase } from '../shared/db'
-import { CalendarService } from '../shared/service'
-import { createMethodTable, type MethodTable } from '../shared/rpc-methods'
+import { getDataDir, getDbPath } from '../shared/paths'
 import { parseIcsEvents } from '../shared/ics'
 import type { Attachment, Calendar, CalendarEvent, Task, TrashItem } from '../shared/types'
+import { Backend, isAppRunning } from './backend'
+import { parseArgs, str } from './args'
+import { CliError } from './errors'
+import { HELP } from './help'
 
 const cliDataDir = readCliDataDir(process.argv.slice(2))
 if (cliDataDir) process.env.LOCAL_CALENDAR_DATA_DIR = resolve(cliDataDir)
@@ -22,133 +23,6 @@ function readCliDataDir(argv: string[]): string | undefined {
   const value = argv[index + 1]
   return value && !value.startsWith('-') ? value : undefined
 }
-
-class CliError extends Error {}
-
-const HELP = `本地日历 CLI — 操作 Local Calendar 的日程与待办
-
-用法: localcal <命令> [参数]
-
-日程:
-  agenda                              今日总览（日程 + 待办）
-  today                               agenda 的快捷别名
-  next                                查看下一条即将开始的日程
-  export [-f 开始] [-t 结束] [-o 文件] 导出 ICS 日程文件
-  import -i 文件                       导入 ICS 日程文件
-  list [-f 开始] [-t 结束] [-c 日历]   查询日程（默认今天起 7 天）
-  create <标题> -s <开始> [-e <结束>]  创建日程
-       [-c 日历] [--all-day] [-l 地点] [-n 说明]
-       [-r 重复] [--remind 分钟[,分钟...]]
-       重复: daily|weekdays|weekly|monthly|yearly
-  update <id> [--title 标题] [-s 开始] [-e 结束] [-c 日历] [-l 地点] [-n 说明]
-       [-r 重复] [--remind 分钟[,分钟...]]
-       -r none 改为不重复；--remind none 清除提醒
-  delete <id>                         删除日程（id 可只写前几位；重复日程删除整个系列）
-  search <关键词>                      搜索日程
-
-待办:
-  task list [--all | --done] [--today | --overdue | --scheduled]
-                                      列出待办（默认未完成）
-  task add <标题> [-d 截止日期] [-n 备注] [-p 优先级] [-r 重复] [--remind 分钟] [--parent 父任务ID]
-  task update <id> [--title 标题] [-d 截止日期] [-n 备注] [-p 优先级] [-r 重复] [--remind 分钟|none] [--parent 父任务ID|none]
-  task done <id...>                   标记一个或多个任务完成
-  task done-all --today|--overdue     按日期批量完成任务
-  task undo <id>                      重新打开
- task delete <id...>                 删除一个或多个待办
-
-日历、附件与回收站:
-  calendars                           列出日历
-  calendar create <名称> [--color 色值]
-  calendar update <id> [--title 名称] [--color 色值]
-  calendar delete <id>
-  attachment list <event|task> <对象ID>
-  attachment add <event|task> <对象ID> -i 文件
-  attachment delete <event|task> <对象ID> <附件ID>
-  trash list | restore <ID> | delete <ID>
-
-其他:
-  doctor                              检查数据目录、数据库和应用连接
-  help                                显示本帮助
-
-通用:
-  --data-dir 目录                       使用指定的数据目录（多个便携包时必填）
-  --json                              以 JSON 输出（便于程序与 AI 解析）
-
-时间格式: ISO 8601（本地时区），如 2026-08-28T14:00；纯日期 2026-08-28 视为全天。
-日历 ID: personal(个人) work(工作) family(家庭) holidays(中国节假日, 只读)
-
-应用运行时改动实时同步到界面；未运行时直接读写本地数据库。`
-
-// ---------- 后端：优先本地 RPC（应用运行中），否则直接读写数据库 ----------
-
-class Backend {
-  private rpc: RpcInfo | null | undefined
-  private table: MethodTable | null = null
-
-  async call<T>(method: string, params: Record<string, unknown> = {}): Promise<T> {
-    const viaApp = await this.tryApp<T>(method, params)
-    if (viaApp !== undefined) return viaApp
-    return this.callOffline<T>(method, params)
-  }
-
-  private async tryApp<T>(method: string, params: Record<string, unknown>): Promise<T | undefined> {
-    if (this.rpc === undefined) this.rpc = probeApp()
-    if (!this.rpc) return undefined
-    try {
-      const res = await fetch(`http://127.0.0.1:${this.rpc.port}/rpc`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.rpc.token}` },
-        body: JSON.stringify({ method, params }),
-        signal: AbortSignal.timeout(3000)
-      })
-      const json = (await res.json()) as { ok: boolean; data?: T; error?: string }
-      if (!json.ok) throw new CliError(json.error || '调用失败')
-      return json.data as T
-    } catch (err) {
-      if (err instanceof CliError) throw err
-      this.rpc = null
-      return undefined
-    }
-  }
-
-  private callOffline<T>(method: string, params: Record<string, unknown>): T {
-    if (!this.table) this.table = createMethodTable(new CalendarService(openDatabase()))
-    const fn = this.table.methods.get(method)
-    if (!fn) throw new CliError(`未知方法: ${method}`)
-    return fn(params) as T
-  }
-}
-
-function probeApp(): RpcInfo | null {
-  const path = getRpcInfoPath()
-  if (!existsSync(path)) return null
-  try {
-    const info = JSON.parse(readFileSync(path, 'utf-8')) as RpcInfo
-    return info?.port && info?.token ? info : null
-  } catch {
-    return null
-  }
-}
-
-// ---------- 参数解析 ----------
-
-const SHORT_TO_LONG: Record<string, string> = {
-  h: 'help',
-  s: 'start',
-  e: 'end',
-  c: 'calendar',
-  l: 'location',
-  n: 'note',
-  d: 'due',
-  f: 'from',
-  t: 'to',
-  r: 'repeat',
-  p: 'priority',
-  o: 'out',
-  i: 'in'
-}
-const VALUE_FLAGS = new Set(['start', 'end', 'calendar', 'location', 'note', 'due', 'from', 'to', 'title', 'repeat', 'remind', 'priority', 'out', 'in', 'data-dir', 'parent', 'color'])
-const BOOL_FLAGS = new Set(['all-day', 'all', 'done', 'today', 'overdue', 'scheduled', 'json', 'help'])
 
 const REPEAT_MAP: Record<string, string> = {
   daily: 'DAILY',
@@ -242,44 +116,6 @@ async function cmdImport(backend: Backend, flags: Record<string, string | true>,
   }
   if (json) return emitJson({ count: imported.length, events: imported })
   console.log(`已导入 ${imported.length} 条日程`)
-}
-
-interface ParsedArgs {
-  flags: Record<string, string | true>
-  positional: string[]
-}
-
-function parseArgs(argv: string[]): ParsedArgs {
-  const flags: Record<string, string | true> = {}
-  const positional: string[] = []
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i]
-    if (a === '--') {
-      positional.push(...argv.slice(i + 1))
-      break
-    }
-    if (a.startsWith('--')) {
-      const key = a.slice(2)
-      if (BOOL_FLAGS.has(key)) flags[key] = true
-      else if (VALUE_FLAGS.has(key)) flags[key] = argv[++i] ?? ''
-      else throw new CliError(`未知选项: ${a}（localcal help 查看用法）`)
-    } else if (a.startsWith('-') && a.length === 2) {
-      const key = SHORT_TO_LONG[a.slice(1)]
-      if (!key) throw new CliError(`未知选项: ${a}（localcal help 查看用法）`)
-      if (BOOL_FLAGS.has(key)) flags[key] = true
-      else flags[key] = argv[++i] ?? ''
-    } else {
-      positional.push(a)
-    }
-  }
-  return { flags, positional }
-}
-
-// ---------- 输出格式 ----------
-
-function str(flags: Record<string, string | true>, key: string): string | undefined {
-  const v = flags[key]
-  return typeof v === 'string' && v ? v : undefined
 }
 
 function shortId(id: string): string {
@@ -704,7 +540,7 @@ async function cmdDoctor(backend: Backend, json: boolean): Promise<void> {
     dataSource: cliDataDir ? '--data-dir' : process.env.LOCAL_CALENDAR_DATA_DIR ? 'LOCAL_CALENDAR_DATA_DIR' : process.env.LOCAL_CALENDAR_PACKAGE_DIR ? '命令所在包目录' : '当前工作目录',
     database: getDbPath(),
     databaseExists: existsSync(getDbPath()),
-    appRunning: probeApp() !== null,
+    appRunning: isAppRunning(),
     calendars: calendars.length,
     events: events.length,
     tasks: tasks.length

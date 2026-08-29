@@ -7,6 +7,7 @@ import { DateTime } from 'luxon'
 import Database from 'better-sqlite3'
 import { isReminderDue } from '../src/shared/reminders.ts'
 import { parseIcsEvents } from '../src/shared/ics.ts'
+import { getDataDir } from '../src/shared/paths.ts'
 
 const parsedIcs = parseIcsEvents(String.raw`BEGIN:VCALENDAR
 BEGIN:VEVENT
@@ -47,7 +48,6 @@ for (const chunk of readdirSync(resolve('out/main/chunks')).filter((name) => nam
 assert.ok(service, 'built service module not found')
 const CalendarService = service.CalendarService ?? service.C
 const openDatabase = service.openDatabase ?? service.o
-const getDataDir = service.getDataDir ?? service.a
 assert.ok(CalendarService && openDatabase, 'service exports not found')
 assert.equal(resolve(getDataDir()), resolve(dataDir))
 const oldSchemaDir = join(dataDir, 'old-schema')

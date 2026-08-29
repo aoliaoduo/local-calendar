@@ -3,6 +3,7 @@ import { copyFileSync, existsSync, readFileSync, renameSync, rmSync } from 'node
 import { DateTime } from 'luxon'
 import type { DB } from './db'
 import { getHolidays, HOLIDAY_CALENDAR_ID } from './lunar'
+import { AttachmentRepository } from './attachment-repository'
 import type {
   Calendar,
   CalendarEvent,
@@ -255,23 +256,13 @@ function rowToTask(r: Record<string, unknown>): Task {
   }
 }
 
-function rowToAttachment(r: Record<string, unknown>): Attachment {
-  return {
-    id: r.id as string,
-    ownerKind: r.owner_kind as Attachment['ownerKind'],
-    ownerId: r.owner_id as string,
-    name: r.name as string,
-    mimeType: r.mime_type as string,
-    size: r.size as number,
-    createdAt: r.created_at as string
-  }
-}
-
 export class CalendarService {
   private db: DB
+  private attachments: AttachmentRepository
 
   constructor(db: DB) {
     this.db = db
+    this.attachments = new AttachmentRepository(db, (kind, id) => kind === 'event' ? this.getEvent(id) !== null : this.getTask(id) !== null)
   }
 
   getBootstrap(from?: string, to?: string): { calendars: Calendar[]; events: CalendarEvent[]; tasks: Task[]; taskOccurrences: Task[] } {
@@ -835,38 +826,26 @@ export class CalendarService {
     if (!row) return false
     const payload = JSON.parse(row.payload as string) as Record<string, unknown>
     const ownerKind = row.kind as 'event' | 'task'
-    this.db.prepare('DELETE FROM attachments WHERE owner_kind = ? AND owner_id = ?').run(ownerKind, payload.id)
+    this.attachments.deleteForOwner(ownerKind, payload.id as string)
     return this.db.prepare('DELETE FROM trash WHERE id = ?').run(id).changes > 0
   }
 
   // ---------- attachments ----------
 
   listAttachments(ownerKind: Attachment['ownerKind'], ownerId: string): Attachment[] {
-    return (this.db.prepare('SELECT id, owner_kind, owner_id, name, mime_type, size, created_at FROM attachments WHERE owner_kind = ? AND owner_id = ? ORDER BY created_at').all(ownerKind, ownerId) as Record<string, unknown>[]).map(rowToAttachment)
+    return this.attachments.list(ownerKind, ownerId)
   }
 
   createAttachment(input: CreateAttachmentInput): Attachment {
-    const ownerId = input.ownerId.trim()
-    if (!ownerId) throw new Error('附件归属不能为空')
-    if (input.ownerKind === 'event' && !this.getEvent(ownerId)) throw new Error('日程不存在，无法添加附件')
-    if (input.ownerKind === 'task' && !this.getTask(ownerId)) throw new Error('任务不存在，无法添加附件')
-    const name = input.name.trim().slice(0, 160) || '附件'
-    const mimeType = input.mimeType.trim().slice(0, 120) || 'application/octet-stream'
-    const content = Buffer.from(input.contentBase64, 'base64')
-    if (!content.length || content.length > 8 * 1024 * 1024) throw new Error('附件大小需在 1 B 到 8 MB 之间')
-    const id = randomUUID()
-    const createdAt = nowIso()
-    this.db.prepare('INSERT INTO attachments (id, owner_kind, owner_id, name, mime_type, size, content, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(id, input.ownerKind, ownerId, name, mimeType, content.length, content, createdAt)
-    return this.listAttachments(input.ownerKind, ownerId).find((attachment) => attachment.id === id)!
+    return this.attachments.create(input)
   }
 
   deleteAttachment(id: string): boolean {
-    return this.db.prepare('DELETE FROM attachments WHERE id = ?').run(id).changes > 0
+    return this.attachments.delete(id)
   }
 
   getAttachmentContent(id: string): { attachment: Attachment; content: Buffer } | null {
-    const row = this.db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as Record<string, unknown> | undefined
-    return row ? { attachment: rowToAttachment(row), content: row.content as Buffer } : null
+    return this.attachments.getContent(id)
   }
 
   // ---------- agenda ----------
