@@ -927,7 +927,7 @@ select {
 .cal-row {
   width: 100%;
   border: none;
-  background: transparent;
+  background: transparent !important;
   text-align: left;
   display: flex;
   align-items: center;
@@ -968,6 +968,7 @@ select {
   height: 32px;
   margin-right: 4px;
   flex: 0 0 32px;
+  background: transparent;
 }
 
 .cal-row-wrap .cal-row-more,
@@ -982,6 +983,10 @@ select {
 
 .cal-row-more:hover {
   background: var(--hover);
+}
+
+.cal-row-more {
+  background: transparent !important;
 }
 
 .cal-row-more .material-icons {
@@ -1456,11 +1461,12 @@ select {
 :root[data-theme='dark'] .cal-row,
 :root[data-theme='dark'] .cal-row-more {
   box-shadow: none;
+  background: transparent !important;
 }
 
 :root[data-theme='dark'] .cal-row-wrap {
   box-shadow: var(--calendar-row-shadow);
-  background: color-mix(in srgb, var(--surface) 88%, #ffffff 12%);
+  background: #101722;
 }
 
 :root[data-theme='dark'] .cal-row-wrap:hover {
