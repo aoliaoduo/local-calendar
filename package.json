@@ -11,7 +11,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "typecheck": "tsc -b --pretty false",
-    "test": "npm run build && node --experimental-strip-types scripts/test-service.mjs && node scripts/test-cli.mjs",
+    "test": "npm run build && node --experimental-strip-types scripts/test-service.mjs && node scripts/test-cli.mjs && node scripts/test-portable-cli.mjs",
     "test:cli": "npm run build && node scripts/test-cli.mjs",
     "dist:win": "npm run build && electron-builder --win zip",
     "dist:win:proxy": "set HTTP_PROXY=http://127.0.0.1:7890&& set HTTPS_PROXY=http://127.0.0.1:7890&& set ALL_PROXY=http://127.0.0.1:7890&& set ELECTRON_GET_USE_PROXY=true&& set GLOBAL_AGENT_HTTP_PROXY=http://127.0.0.1:7890&& npm run dist:win",
@@ -38,6 +38,12 @@
       "bin/**/*",
       "src/renderer/icon.ico",
       "package.json"
+    ],
+    "extraFiles": [
+      {
+        "from": "bin/localcal-portable.cmd",
+        "to": "localcal.cmd"
+      }
     ],
     "artifactName": "${productName}-${version}-portable.${ext}",
     "electronDist": "node_modules/electron/dist",

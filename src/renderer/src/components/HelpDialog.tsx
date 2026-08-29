@@ -29,7 +29,7 @@ export default function HelpDialog({ calendars, onClose }: HelpDialogProps) {
           <div className="settings-section-title">AI / CLI</div>
           <p>AI 可以通过 `localcal` 命令直接操作本地数据，不需要登录或云端服务。</p>
           <div className="help-code-wrap"><pre className="help-code">{aiExample}</pre><button className="btn-text compact" onClick={() => { void navigator.clipboard.writeText(aiExample).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }) }}>{copied ? '已复制' : '复制示例'}</button></div>
-          <p>建议 AI 使用 `--json` 获取稳定结构化结果；多个便携包并存时，使用 `--data-dir` 明确指定目标包的 data 目录。</p>
+          <p>建议 AI 使用 `--json` 获取稳定结构化结果；多个便携包并存时，使用 `--data-dir` 明确指定目标包的 data 目录。ZIP 便携版可直接运行包目录的 `localcal.cmd`，无需另装 Node。</p>
         </section>
         <section className="help-section">
           <div className="settings-section-title">当前日历</div>
