@@ -349,6 +349,14 @@ function importIcsFile(path: string): number {
   return events.length
 }
 
+function pruneManagedBackups(backupDir: string, prefix: string, keep: number): void {
+  const backups = readdirSync(backupDir)
+    .filter((name) => name.startsWith(prefix) && name.endsWith('.db'))
+    .map((name) => ({ name, time: statSync(join(backupDir, name)).mtimeMs }))
+    .sort((first, second) => second.time - first.time)
+  for (const old of backups.slice(keep)) unlinkSync(join(backupDir, old.name))
+}
+
 async function runAutoBackup(): Promise<void> {
   if (!app.isPackaged) return
   const backupDir = join(getDataDir(), 'backups')
@@ -356,11 +364,7 @@ async function runAutoBackup(): Promise<void> {
   const backupPath = join(backupDir, `auto-${new Date().toISOString().replace(/[:.]/g, '-')}.db`)
   try {
     await svc.backupTo(backupPath)
-    const backups = readdirSync(backupDir)
-      .filter((name) => name.startsWith('auto-') && name.endsWith('.db'))
-      .map((name) => ({ name, time: statSync(join(backupDir, name)).mtimeMs }))
-      .sort((first, second) => second.time - first.time)
-    for (const old of backups.slice(14)) unlinkSync(join(backupDir, old.name))
+    pruneManagedBackups(backupDir, 'auto-', 14)
   } catch {
     // 自动备份失败不影响应用继续运行
   }
@@ -516,6 +520,11 @@ app.whenReady().then(() => {
     const backupDir = join(getDataDir(), 'backups')
     mkdirSync(backupDir, { recursive: true })
     await svc.backupTo(join(backupDir, `before-restore-${new Date().toISOString().replace(/[:.]/g, '-')}.db`))
+    try {
+      pruneManagedBackups(backupDir, 'before-restore-', 10)
+    } catch {
+      // 清理旧快照失败不应阻止当前恢复
+    }
     svc.restoreFrom(result.filePaths[0], getDbPath())
     isQuitting = true
     app.relaunch()
