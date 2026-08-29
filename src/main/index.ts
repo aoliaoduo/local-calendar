@@ -270,8 +270,8 @@ function buildTrayMenu(): Menu {
   return Menu.buildFromTemplate([
     { label: '打开本地日历', click: () => BrowserWindow.getAllWindows()[0]?.show() },
     { type: 'separator' },
-    { label: `今日安排（${eventItems.length}）`, submenu: eventItems.length ? eventItems : [{ label: '今天没有日程', enabled: false }] },
     { label: `已逾期任务（${overdueItems.length}）`, submenu: overdueItems.length ? overdueItems : [{ label: '没有逾期任务', enabled: false }] },
+    { label: `今日安排（${eventItems.length}）`, submenu: eventItems.length ? eventItems : [{ label: '今天没有日程', enabled: false }] },
     { label: `未完成任务（${taskItems.length}）`, submenu: taskItems.length ? taskItems : [{ label: '没有未完成任务', enabled: false }] },
     { type: 'separator' },
     { label: '退出', click: () => { isQuitting = true; app.quit() } }
