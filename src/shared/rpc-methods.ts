@@ -29,6 +29,7 @@ export function createMethodTable(svc: CalendarService): MethodTable {
     svc.listEvents(p.from as string | undefined, p.to as string | undefined, p.calendarId as string | undefined)
   )
   register('events.search', false, (p) => svc.searchEvents(p.query as string))
+  register('tasks.search', false, (p) => svc.searchTasks(p.query as string))
   register('events.update', true, (p) => svc.updateEvent(p.id as string, p.patch as never))
   register('events.updateOccurrence', true, (p) => svc.updateEventOccurrence(p.id as string, p.occurrenceIndex as number, p.patch as never))
   register('events.delete', true, (p) => svc.deleteEvent(p.id as string))

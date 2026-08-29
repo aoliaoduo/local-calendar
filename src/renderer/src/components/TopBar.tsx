@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { DateTime } from 'luxon'
 import { getLunarMonthLabel } from '@shared/lunar'
-import { api, type AppToastInfo, type CalendarInfo, type EventInfo } from '../api'
+import { api, type AppToastInfo, type CalendarInfo, type EventInfo, type SearchResult } from '../api'
 import { fmtEventTime } from '../dateUtils'
 
 export type ViewKind = 'day' | '4day' | 'week' | 'month' | 'year' | 'agenda'
@@ -18,7 +18,7 @@ interface TopBarProps {
   onToday: () => void
   tasksOpen: boolean
   onToggleTasks: () => void
-  onSearchPick: (event: EventInfo) => void
+  onSearchPick: (result: SearchResult) => void
   onToast: (message: string) => void
   onSettings: () => void
   onHelp: () => void
@@ -69,7 +69,7 @@ export default function TopBar({
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<EventInfo[]>([])
+  const [results, setResults] = useState<SearchResult[]>([])
   const [maximized, setMaximized] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -93,9 +93,11 @@ export default function TopBar({
       return
     }
     const t = setTimeout(() => {
-      api
-        .searchEvents(q)
-        .then((r) => setResults(r.slice(0, 10)))
+      Promise.all([api.searchEvents(q), api.searchTasks(q)])
+        .then(([events, tasks]) => setResults([
+          ...events.map((item) => ({ kind: 'event' as const, item })),
+          ...tasks.map((item) => ({ kind: 'task' as const, item }))
+        ].slice(0, 12)))
         .catch(() => setResults([]))
     }, 250)
     return () => clearTimeout(t)
@@ -108,9 +110,9 @@ export default function TopBar({
   }
 
   return (
-    <header className="topbar" onPointerDownCapture={() => { onTransientDismiss?.(); document.dispatchEvent(new Event('calendar-transient-dismiss')) }} onContextMenu={(event) => event.preventDefault()}>
+    <header className="topbar" role="banner" onPointerDownCapture={() => { onTransientDismiss?.(); document.dispatchEvent(new Event('calendar-transient-dismiss')) }} onContextMenu={(event) => event.preventDefault()}>
       <div className="window-drag-region" />
-      <button className="icon-btn" title="主菜单" onClick={onToggleSidebar}>
+      <button className="icon-btn" aria-label="主菜单" title="主菜单" onClick={onToggleSidebar}>
         <span className="material-icons">menu</span>
       </button>
       <div className="logo-block">
@@ -141,26 +143,28 @@ export default function TopBar({
               {results.length === 0 ? (
                 <div className="search-empty">没有匹配的日程</div>
               ) : (
-                results.map((evt) => {
-                  const color = evt.colorOverride || calById.get(evt.calendarId)?.color || '#1a73e8'
-                  const start = DateTime.fromISO(evt.startUtc)
-                  const end = DateTime.fromISO(evt.endUtc)
+                results.map((result, index) => {
+                  const evt = result.kind === 'event' ? result.item : null
+                  const task = result.kind === 'task' ? result.item : null
+                  const color = evt ? evt.colorOverride || calById.get(evt.calendarId)?.color || '#1a73e8' : '#5f6368'
+                  const start = evt ? DateTime.fromISO(evt.startUtc) : null
+                  const end = evt ? DateTime.fromISO(evt.endUtc) : null
                   return (
                     <button
-                      key={evt.id}
+                      key={`${result.kind}-${evt?.id ?? task?.id}-${index}`}
                       className="search-item"
                       onClick={() => {
-                        onSearchPick(evt)
+                        onSearchPick(result)
                         closeSearch()
                       }}
                     >
                       <span className="bar" style={{ background: color }} />
                       <span className="body">
-                        <span className="t">{evt.title}</span>
+                        <span className="t"><span className="search-kind">{evt ? '日程' : '任务'}</span>{evt?.title ?? task?.title}</span>
                         <span className="d">
-                          {fmtEventTime(start, end)}
+                          {evt && start && end ? fmtEventTime(start, end) : task?.dueAt ? `截止 ${DateTime.fromISO(task.dueAt).toLocal().toFormat('yyyy-MM-dd')}` : '无截止日期'}
                           {' · '}
-                          {calById.get(evt.calendarId)?.name ?? evt.calendarId}
+                          {evt ? calById.get(evt.calendarId)?.name ?? evt.calendarId : '我的任务'}
                         </span>
                       </span>
                     </button>
@@ -172,7 +176,7 @@ export default function TopBar({
         </div>
       ) : (
         <div className="topbar-title-group">
-          <button className="today-btn" onClick={onToday}>
+          <button className="today-btn" aria-label="回到今天" onClick={onToday}>
             今天
           </button>
           <button className="icon-btn" title="上一页" onClick={onPrev}>
@@ -237,7 +241,7 @@ export default function TopBar({
         </div>
 
         <div className="view-menu-wrap">
-          <button className="view-select" onClick={() => setMenuOpen((v) => !v)}>
+          <button className="view-select" aria-label="视图切换器" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}>
             {VIEW_LABEL[view]}
             <span className="material-icons">arrow_drop_down</span>
           </button>
@@ -248,7 +252,7 @@ export default function TopBar({
                 {(['day', '4day', 'week', 'month', 'year', 'agenda'] as const).map((v) => (
                   <button
                     key={v}
-                    className={`view-menu-item${view === v ? ' current' : ''}`}
+                    className={`view-menu-item${view === v ? ' current' : ''}`} role="menuitemradio" aria-checked={view === v}
                     onClick={() => {
                       onViewChange(v)
                       setMenuOpen(false)

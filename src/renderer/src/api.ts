@@ -71,6 +71,10 @@ export interface EventInfo {
   reminders: ReminderInfo[]
 }
 
+export type SearchResult =
+  | { kind: 'event'; item: EventInfo }
+  | { kind: 'task'; item: TaskInfo }
+
 export interface TaskInfo {
   id: string
   title: string
@@ -102,6 +106,7 @@ export const api = {
   deleteCalendar: (id: string) => rpc<boolean>('calendars.delete', { id }),
   listEvents: (from?: string, to?: string) => rpc<EventInfo[]>('events.list', { from, to }),
   searchEvents: (query: string) => rpc<EventInfo[]>('events.search', { query }),
+  searchTasks: (query: string) => rpc<TaskInfo[]>('tasks.search', { query }),
   createEvent: (input: Record<string, unknown>) => rpc<EventInfo>('events.create', input),
   updateEvent: (id: string, patch: Record<string, unknown>) => rpc<EventInfo | null>('events.update', { id, patch }),
   updateEventOccurrence: (id: string, occurrenceIndex: number, patch: Record<string, unknown>) =>

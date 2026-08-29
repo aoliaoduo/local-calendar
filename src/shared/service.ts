@@ -473,6 +473,14 @@ export class CalendarService {
     return rows.map(rowToEvent)
   }
 
+  searchTasks(query: string): Task[] {
+    const q = `%${query.trim()}%`
+    const rows = this.db
+      .prepare("SELECT * FROM tasks WHERE title LIKE ? OR notes LIKE ? ORDER BY status, due_at IS NULL, due_at, sort_order LIMIT 100")
+      .all(q, q) as Record<string, unknown>[]
+    return rows.map(rowToTask)
+  }
+
   updateEvent(id: string, patch: UpdateEventInput): CalendarEvent | null {
     const cur = this.db.prepare('SELECT * FROM events WHERE id = ?').get(id) as Record<string, unknown> | undefined
     if (!cur) throw new Error(`日程不存在: ${id}`)

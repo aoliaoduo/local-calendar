@@ -16,7 +16,7 @@ import AppearanceDialog from './components/AppearanceDialog'
 import ProfileDialog from './components/ProfileDialog'
 import CalendarEditDialog from './components/CalendarEditDialog'
 import TaskDialog from './components/TaskDialog'
-import { api, type AppToastInfo, type CalendarInfo, type EventInfo, type TaskInfo } from './api'
+import { api, type AppToastInfo, type CalendarInfo, type EventInfo, type SearchResult, type TaskInfo } from './api'
 import { weekDates } from './dateUtils'
 
 export default function App() {
@@ -412,10 +412,17 @@ export default function App() {
         }}
         onClearNotifications={() => setNotifications([])}
         onTransientDismiss={dismissTransient}
-        onSearchPick={(evt) => {
-          setCursor(DateTime.fromISO(evt.startUtc) as DateTime<true>)
-          setView('day')
-          openEvent(evt)
+        onSearchPick={(result: SearchResult) => {
+          if (result.kind === 'event') {
+            setCursor(DateTime.fromISO(result.item.startUtc) as DateTime<true>)
+            setView('day')
+            openEvent(result.item)
+          } else {
+            const task = result.item
+            setCursor(task.dueAt ? DateTime.fromISO(task.dueAt) as DateTime<true> : DateTime.now())
+            setView('day')
+            setTaskToEdit(task)
+          }
         }}
       />
 
