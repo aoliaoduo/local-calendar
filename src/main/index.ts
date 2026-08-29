@@ -241,11 +241,11 @@ function buildTrayMenu(): Menu {
       label: `${event.isAllDay ? '全天' : DateTime.fromISO(event.startUtc).toLocal().toFormat('HH:mm')}  ${event.title}`,
       click: () => focusTarget('event', event.id)
     }))
-    taskItems = svc.listTaskOccurrences(today, today).filter((task) => task.status === 'needsAction').slice(0, 8).map((task) => ({
+    taskItems = svc.listTaskOccurrences(today, today).filter((task) => task.status === 'needsAction').sort((a, b) => (a.dueAt || '').localeCompare(b.dueAt || '')).slice(0, 8).map((task) => ({
       label: task.dueAt ? `${task.title}（${DateTime.fromISO(task.dueAt).toLocal().toFormat('M月d日')}）` : task.title,
       click: () => focusTarget('task', task.id)
     }))
-    overdueItems = svc.listTasks({ status: 'needsAction', dueBefore: today }).slice(0, 8).map((task) => ({
+    overdueItems = svc.listTasks({ status: 'needsAction', dueBefore: today }).sort((a, b) => (a.dueAt || '').localeCompare(b.dueAt || '')).slice(0, 8).map((task) => ({
       label: task.dueAt ? `${task.title}（${DateTime.fromISO(task.dueAt).toLocal().toFormat('M月d日')}）` : task.title,
       click: () => focusTarget('task', task.id)
     }))

@@ -9,8 +9,10 @@ interface TasksPanelProps {
 
 export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const [tasks, setTasks] = useState<TaskInfo[]>([])
-  const [adding, setAdding] = useState(false)
+  const [adding, setAdding] = useState(true)
   const [newTitle, setNewTitle] = useState('')
+  const [newNotes, setNewNotes] = useState('')
+  const [newDraft, setNewDraft] = useState('')
   const today = DateTime.now().toISODate()!
   const [newDue, setNewDue] = useState(today)
   const [newReminder, setNewReminder] = useState('900')
@@ -19,6 +21,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const [showDone, setShowDone] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [editDue, setEditDue] = useState('')
@@ -28,7 +31,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const [editPriority, setEditPriority] = useState('0')
   const [dragId, setDragId] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'today' | 'overdue' | 'scheduled'>('all')
-  const [sortMode, setSortMode] = useState<'manual' | 'due' | 'priority' | 'created'>('manual')
+  const [sortMode, setSortMode] = useState<'manual' | 'due' | 'priority' | 'created'>('due')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const taskAddRef = useRef<HTMLDivElement>(null)
   const [editRrule, setEditRrule] = useState('')
@@ -58,6 +61,8 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
       if (!taskAddRef.current?.contains(event.target as Node)) {
         setAdding(false)
         setNewTitle('')
+        setNewNotes('')
+        setNewDraft('')
         setNewDue(today)
         setNewReminder('900')
         setNewRrule('')
@@ -70,8 +75,10 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const handleAdd = async () => {
     const title = newTitle.trim()
     if (!title) return
-    await api.createTask({ title, dueAt: newDue || undefined, reminderMinutes: newReminder === '' ? null : Number(newReminder), priority: Number(newPriority), rrule: newRrule || null })
+    await api.createTask({ title, notes: newNotes.trim() || undefined, dueAt: newDue || undefined, reminderMinutes: newReminder === '' ? null : Number(newReminder), priority: Number(newPriority), rrule: newRrule || null })
     setNewTitle('')
+    setNewNotes('')
+    setNewDraft('')
     setNewDue(today)
     setNewReminder('900')
     setNewPriority('0')
@@ -276,6 +283,9 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
           <span className="material-icons">close</span>
         </button>
         <span className="tasks-title">我的任务</span>
+        <button className="icon-btn" title="搜索任务" onClick={() => setSearchOpen(true)}>
+          <span className="material-icons">search</span>
+        </button>
         <button className="icon-btn" title="更多" onClick={() => setMoreOpen((value) => !value)}>
           <span className="material-icons">more_vert</span>
         </button>
@@ -287,7 +297,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
       </div>
 
       <div className="tasks-list">
-        <input className="task-search" placeholder="搜索任务" value={query} onChange={(event) => setQuery(event.target.value)} />
+        {query || searchOpen ? <input autoFocus className="task-search" placeholder="搜索任务" value={query} onChange={(event) => setQuery(event.target.value)} onBlur={() => { if (!query) setSearchOpen(false) }} /> : null}
         <div className="task-filters" role="tablist" aria-label="任务筛选">
           {([['all', '全部'], ['today', '今天'], ['overdue', '逾期'], ['scheduled', '有日期']] as const).map(([key, label]) => <button key={key} className={filter === key ? 'active' : ''} onClick={() => setFilter(key)}>{label}</button>)}
         </div>
@@ -296,16 +306,18 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
         {adding ? (
           <div ref={taskAddRef} className="task-add-form">
             <span className="task-add-check" />
-            <input
+            <textarea
               autoFocus
-              placeholder="任务标题"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
+              className="task-add-title"
+              placeholder="任务标题\n描述（可选）"
+              value={newDraft}
+              onChange={(e) => { const value = e.target.value; const lines = value.split(/\r?\n/); setNewDraft(value); setNewTitle(lines[0] ?? ''); setNewNotes(lines.slice(1).join('\n')) }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') void handleAdd()
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void handleAdd()
                 if (e.key === 'Escape') {
                   setAdding(false)
                   setNewTitle('')
+                  setNewNotes('')
                   setNewDue(today)
                 }
               }}

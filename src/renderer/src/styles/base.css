@@ -19,6 +19,7 @@
   --surface: #f8fafd;
   --panel-shadow: 0 2px 8px rgba(22, 48, 86, 0.12);
   --dialog-shadow: 0 16px 48px rgba(22, 48, 86, 0.24);
+  --calendar-row-shadow: 0 1px 3px rgba(60, 64, 67, 0.16);
   --font: 'Roboto', 'Microsoft YaHei', 'PingFang SC', sans-serif;
 }
 
@@ -36,6 +37,7 @@
   --blue-soft: #172943;
   --panel-shadow: 0 2px 10px rgba(0, 0, 0, 0.42);
   --dialog-shadow: 0 16px 48px rgba(0, 0, 0, 0.58);
+  --calendar-row-shadow: 0 1px 3px rgba(60, 64, 67, 0.16);
 }
 
 :root[data-theme='dark'] *::-webkit-scrollbar-thumb {
@@ -936,6 +938,7 @@ select {
   width: 100%;
   border-radius: 4px;
   transition: background-color 0.16s ease, transform 0.16s ease;
+  box-shadow: var(--calendar-row-shadow);
 }
 
 .cal-row-wrap .cal-row {
@@ -1443,7 +1446,6 @@ select {
 }
 
 :root[data-theme='dark'] .cal-row,
-:root[data-theme='dark'] .cal-row-wrap,
 :root[data-theme='dark'] .cal-row-more {
   box-shadow: none;
 }

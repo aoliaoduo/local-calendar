@@ -1470,19 +1470,24 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
   padding: 4px 16px 8px;
+  margin-left: auto;
+  width: fit-content;
+  border-radius: 16px;
+  background: var(--blue-soft);
   color: var(--text-4);
   font-size: 12px;
 }
 
 .task-sort select {
-  min-width: 108px;
-  border: 1px solid var(--divider);
-  border-radius: 6px;
-  padding: 4px 8px;
+  min-width: 112px;
+  border: none;
+  border-radius: 12px;
+  padding: 4px 18px 4px 4px;
   background: transparent;
   color: var(--text-2);
+  font-size: 12px;
 }
 
 .task-sort > .material-icons { font-size: 17px; color: var(--g-blue); }
@@ -1512,7 +1517,8 @@
   position: absolute;
 }
 
-.task-add-form input {
+.task-add-form input,
+.task-add-form .task-add-title {
   border: none;
   border-bottom: 1px solid var(--divider);
   padding: 6px 0;
@@ -1524,7 +1530,14 @@
   width: calc(100% - 32px);
 }
 
-.task-add-form input:focus {
+.task-add-form .task-add-title {
+  min-height: 58px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.task-add-form input:focus,
+.task-add-form .task-add-title:focus {
   border-bottom: 2px solid var(--g-blue);
   padding-bottom: 5px;
 }
