@@ -142,12 +142,20 @@ async function dispatch(
 let rpcServer: Server | null = null
 let tray: Tray | null = null
 let isQuitting = false
+const MAX_RPC_BODY_BYTES = 1_000_000
 
 function startRpcServer(getWindows: () => BrowserWindow[]): void {
   const token = randomBytes(24).toString('hex')
   rpcServer = createServer((req, res) => {
     if (req.method !== 'POST' || req.url !== '/rpc') {
       res.writeHead(404).end()
+      return
+    }
+    const contentLength = Number(req.headers['content-length'])
+    if (Number.isFinite(contentLength) && contentLength > MAX_RPC_BODY_BYTES) {
+      res.writeHead(413, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ ok: false, error: 'request body too large' }))
+      req.resume()
       return
     }
     const auth = req.headers.authorization || ''
@@ -158,9 +166,14 @@ function startRpcServer(getWindows: () => BrowserWindow[]): void {
     }
     let body = ''
     let tooLarge = false
-    req.on('data', (chunk) => {
+    req.setEncoding('utf8')
+    req.on('data', (chunk: string) => {
+      if (tooLarge) return
       body += chunk
-      if (body.length > 1_000_000) tooLarge = true
+      if (Buffer.byteLength(body, 'utf8') > MAX_RPC_BODY_BYTES) {
+        tooLarge = true
+        body = ''
+      }
     })
     req.on('end', async () => {
       if (tooLarge) {
@@ -170,15 +183,21 @@ function startRpcServer(getWindows: () => BrowserWindow[]): void {
       }
       let method = ''
       let params: Record<string, unknown> = {}
+      let parsed: { method?: unknown; params?: unknown }
       try {
-        const parsed = JSON.parse(body || '{}')
-        method = parsed.method
-        params = parsed.params ?? {}
+        parsed = JSON.parse(body || '{}') as { method?: unknown; params?: unknown }
       } catch {
         res.writeHead(400, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ ok: false, error: 'invalid JSON' }))
         return
       }
+      if (typeof parsed.method !== 'string' || (parsed.params !== undefined && (typeof parsed.params !== 'object' || parsed.params === null || Array.isArray(parsed.params)))) {
+        res.writeHead(400, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: false, error: 'invalid RPC request' }))
+        return
+      }
+      method = parsed.method
+      params = (parsed.params as Record<string, unknown> | undefined) ?? {}
       const result = await dispatch(method, params)
       if (result.ok && mutating.has(method)) {
         for (const win of getWindows()) win.webContents.send('data-changed', { method })
@@ -197,15 +216,24 @@ function startRpcServer(getWindows: () => BrowserWindow[]): void {
 }
 
 function createWindow(): void {
-  const workArea = screen.getPrimaryDisplay().workAreaSize
+  const workArea = screen.getPrimaryDisplay().workArea
   const saved = readWindowState()
+  const width = Math.min(saved.width ?? 1440, workArea.width)
+  const height = Math.min(saved.height ?? 860, workArea.height)
+  const hasVisiblePosition = typeof saved.x === 'number'
+    && typeof saved.y === 'number'
+    && screen.getAllDisplays().some((display) => {
+      const area = display.workArea
+      return saved.x! < area.x + area.width && saved.x! + width > area.x
+        && saved.y! < area.y + area.height && saved.y! + height > area.y
+    })
   const win = new BrowserWindow({
-    width: saved.width ?? Math.min(1440, workArea.width),
-    height: saved.height ?? Math.min(860, workArea.height),
-    ...(typeof saved.x === 'number' && typeof saved.y === 'number' ? { x: saved.x, y: saved.y } : {}),
+    width,
+    height,
+    ...(hasVisiblePosition ? { x: saved.x, y: saved.y } : {}),
     minWidth: 760,
     minHeight: 520,
-    center: true,
+    center: !hasVisiblePosition,
     backgroundColor: '#ffffff',
     autoHideMenuBar: true,
     frame: false,
