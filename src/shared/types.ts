@@ -115,6 +115,7 @@ export interface CreateTaskInput {
 }
 
 export interface UpdateTaskInput {
+  parentId?: string | null
   title?: string
   notes?: string | null
   dueAt?: string | null

@@ -1,12 +1,12 @@
 import { readFileSync, existsSync, writeFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { basename, dirname, extname, resolve } from 'node:path'
 import { DateTime } from 'luxon'
 import { getDataDir, getDbPath, getRpcInfoPath, type RpcInfo } from '../shared/paths'
 import { openDatabase } from '../shared/db'
 import { CalendarService } from '../shared/service'
 import { createMethodTable, type MethodTable } from '../shared/rpc-methods'
 import { parseIcsEvents } from '../shared/ics'
-import type { Calendar, CalendarEvent, Task } from '../shared/types'
+import type { Attachment, Calendar, CalendarEvent, Task, TrashItem } from '../shared/types'
 
 const cliDataDir = readCliDataDir(process.argv.slice(2))
 if (cliDataDir) process.env.LOCAL_CALENDAR_DATA_DIR = resolve(cliDataDir)
@@ -50,14 +50,23 @@ const HELP = `本地日历 CLI — 操作 Local Calendar 的日程与待办
   task list [--all | --done] [--today | --overdue | --scheduled]
                                       列出待办（默认未完成）
   task add <标题> [-d 截止日期] [-n 备注] [-p 优先级] [-r 重复] [--remind 分钟] [--parent 父任务ID]
-  task update <id> [--title 标题] [-d 截止日期] [-n 备注] [-p 优先级] [-r 重复] [--remind 分钟|none]
+  task update <id> [--title 标题] [-d 截止日期] [-n 备注] [-p 优先级] [-r 重复] [--remind 分钟|none] [--parent 父任务ID|none]
   task done <id...>                   标记一个或多个任务完成
   task done-all --today|--overdue     按日期批量完成任务
   task undo <id>                      重新打开
-  task delete <id...>                 删除一个或多个待办
+ task delete <id...>                 删除一个或多个待办
+
+日历、附件与回收站:
+  calendars                           列出日历
+  calendar create <名称> [--color 色值]
+  calendar update <id> [--title 名称] [--color 色值]
+  calendar delete <id>
+  attachment list <event|task> <对象ID>
+  attachment add <event|task> <对象ID> -i 文件
+  attachment delete <event|task> <对象ID> <附件ID>
+  trash list | restore <ID> | delete <ID>
 
 其他:
- calendars                           列出日历
   doctor                              检查数据目录、数据库和应用连接
   help                                显示本帮助
 
@@ -138,7 +147,7 @@ const SHORT_TO_LONG: Record<string, string> = {
   o: 'out',
   i: 'in'
 }
-const VALUE_FLAGS = new Set(['start', 'end', 'calendar', 'location', 'note', 'due', 'from', 'to', 'title', 'repeat', 'remind', 'priority', 'out', 'in', 'data-dir', 'parent'])
+const VALUE_FLAGS = new Set(['start', 'end', 'calendar', 'location', 'note', 'due', 'from', 'to', 'title', 'repeat', 'remind', 'priority', 'out', 'in', 'data-dir', 'parent', 'color'])
 const BOOL_FLAGS = new Set(['all-day', 'all', 'done', 'today', 'overdue', 'scheduled', 'json', 'help'])
 
 const REPEAT_MAP: Record<string, string> = {
@@ -561,7 +570,8 @@ async function cmdTaskUpdate(
   if (flags.remind !== undefined) patch.reminderMinutes = parseTaskReminder(str(flags, 'remind'))
   if (flags.priority !== undefined) patch.priority = parseTaskPriority(str(flags, 'priority'))
   if (flags.repeat !== undefined) patch.rrule = str(flags, 'repeat') === 'none' ? null : repeatRrule(str(flags, 'repeat')!)
-  if (!Object.keys(patch).length) throw new CliError('没有要修改的字段（--title / -d / -n / -p / -r / --remind）')
+  if (flags.parent !== undefined) patch.parentId = str(flags, 'parent') === 'none' ? null : (await resolveTask(backend, str(flags, 'parent'))).id
+  if (!Object.keys(patch).length) throw new CliError('没有要修改的字段（--title / -d / -n / -p / -r / --remind / --parent）')
   const task = await backend.call<Task>('tasks.update', { id: target.id, patch })
   if (json) return emitJson(task)
   console.log(`已更新待办 → ${fmtTaskLine(task)}`)
@@ -585,6 +595,104 @@ async function cmdCalendars(backend: Backend, json: boolean): Promise<void> {
   for (const c of cals) {
     console.log(`${c.id.padEnd(10)} ${c.name.padEnd(8)} ${c.color}  ${c.isVisible ? '可见' : '隐藏'}${c.id === 'holidays' ? '（只读）' : ''}`)
   }
+}
+
+async function cmdCalendar(backend: Backend, flags: Record<string, string | true>, args: string[], json: boolean): Promise<void> {
+  const [action, id] = args
+  if (action === 'list') return cmdCalendars(backend, json)
+  if (action === 'create') {
+    const name = args.slice(1).join(' ').trim()
+    if (!name) throw new CliError('缺少日历名称。用法: calendar create <名称> [--color 色值]')
+    const calendar = await backend.call<Calendar>('calendars.create', { name, color: str(flags, 'color') })
+    if (json) return emitJson(calendar)
+    console.log(`已创建日历 → ${calendar.name}  id:${shortId(calendar.id)}`)
+    return
+  }
+  if (action === 'update') {
+    const target = (await calNames(backend)).has(id ?? '') ? id! : undefined
+    if (!target) throw new CliError('缺少或不存在的日历 ID（先用 calendars 查看）')
+    const patch: Record<string, unknown> = {}
+    if (str(flags, 'title')) patch.name = str(flags, 'title')
+    if (str(flags, 'color')) patch.color = str(flags, 'color')
+    if (!Object.keys(patch).length) throw new CliError('没有要修改的字段（--title / --color）')
+    const calendar = await backend.call<Calendar>('calendars.update', { id: target, patch })
+    if (json) return emitJson(calendar)
+    console.log(`已更新日历 → ${calendar?.name ?? target}`)
+    return
+  }
+  if (action === 'delete') {
+    if (!id) throw new CliError('缺少日历 ID（先用 calendars 查看）')
+    const ok = await backend.call<boolean>('calendars.delete', { id })
+    if (json) return emitJson({ ok, id })
+    console.log(ok ? `已删除日历 ${id}` : `未找到日历 ${id}`)
+    return
+  }
+  throw new CliError('日历用法: calendar list|create|update|delete')
+}
+
+function attachmentMimeType(path: string): string {
+  const ext = extname(path).toLowerCase()
+  if (ext === '.png') return 'image/png'
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg'
+  if (ext === '.webp') return 'image/webp'
+  if (ext === '.pdf') return 'application/pdf'
+  if (ext === '.txt' || ext === '.md') return 'text/plain'
+  return 'application/octet-stream'
+}
+
+async function attachmentOwner(backend: Backend, kind: string | undefined, id: string | undefined): Promise<{ kind: 'event' | 'task'; id: string }> {
+  if (kind === 'event') return { kind, id: (await resolveEvent(backend, id)).id }
+  if (kind === 'task') return { kind, id: (await resolveTask(backend, id)).id }
+  throw new CliError('附件类型必须是 event 或 task')
+}
+
+async function cmdAttachment(backend: Backend, flags: Record<string, string | true>, args: string[], json: boolean): Promise<void> {
+  const [action, kind, ownerPrefix, attachmentPrefix] = args
+  if (!['list', 'add', 'delete'].includes(action ?? '')) throw new CliError('附件用法: attachment list|add|delete <event|task> <对象ID>')
+  const owner = await attachmentOwner(backend, kind, ownerPrefix)
+  const attachments = await backend.call<Attachment[]>('attachments.list', { ownerKind: owner.kind, ownerId: owner.id })
+  if (action === 'list') {
+    if (json) return emitJson(attachments)
+    for (const attachment of attachments) console.log(`${attachment.name}  ${attachment.size} B  id:${shortId(attachment.id)}`)
+    return
+  }
+  if (action === 'add') {
+    const input = str(flags, 'in')
+    if (!input) throw new CliError('缺少文件。用法: attachment add <event|task> <对象ID> -i 文件')
+    let content: Buffer
+    try {
+      content = readFileSync(input)
+    } catch {
+      throw new CliError(`无法读取附件文件: ${input}`)
+    }
+    const attachment = await backend.call<Attachment>('attachments.create', { ownerKind: owner.kind, ownerId: owner.id, name: basename(input), mimeType: attachmentMimeType(input), contentBase64: content.toString('base64') })
+    if (json) return emitJson(attachment)
+    console.log(`已添加附件 → ${attachment.name}  id:${shortId(attachment.id)}`)
+    return
+  }
+  if (!attachmentPrefix) throw new CliError('缺少附件 ID（先用 attachment list 查看）')
+  const matches = attachments.filter((attachment) => attachment.id === attachmentPrefix || attachment.id.startsWith(attachmentPrefix))
+  if (matches.length !== 1) throw new CliError(matches.length ? `附件 ID 前缀 "${attachmentPrefix}" 不唯一` : '附件不存在')
+  const ok = await backend.call<boolean>('attachments.delete', { id: matches[0].id })
+  if (json) return emitJson({ ok, id: matches[0].id })
+  console.log(ok ? `已删除附件 ${matches[0].name}` : '删除附件失败')
+}
+
+async function cmdTrash(backend: Backend, args: string[], json: boolean): Promise<void> {
+  const [action, prefix] = args
+  const items = await backend.call<TrashItem[]>('trash.list')
+  if (action === 'list') {
+    if (json) return emitJson(items)
+    for (const item of items) console.log(`${item.kind === 'event' ? '日程' : '任务'}  ${item.title}  id:${shortId(item.id)}`)
+    return
+  }
+  if (!['restore', 'delete'].includes(action ?? '') || !prefix) throw new CliError('回收站用法: trash list|restore <ID>|delete <ID>')
+  const matches = items.filter((item) => item.id === prefix || item.id.startsWith(prefix))
+  if (matches.length !== 1) throw new CliError(matches.length ? `回收站 ID 前缀 "${prefix}" 不唯一` : '回收站项目不存在')
+  const method = action === 'restore' ? 'trash.restore' : 'trash.delete'
+  const ok = await backend.call<boolean>(method, { id: matches[0].id })
+  if (json) return emitJson({ ok, id: matches[0].id })
+  console.log(ok ? (action === 'restore' ? '已恢复回收站项目' : '已永久删除回收站项目') : '操作失败')
 }
 
 async function cmdDoctor(backend: Backend, json: boolean): Promise<void> {
@@ -652,6 +760,12 @@ async function main(): Promise<void> {
       return cmdSearch(backend, rest, json)
     case 'calendars':
       return cmdCalendars(backend, json)
+    case 'calendar':
+      return cmdCalendar(backend, flags, rest, json)
+    case 'attachment':
+      return cmdAttachment(backend, flags, rest, json)
+    case 'trash':
+      return cmdTrash(backend, rest, json)
     case 'doctor':
       return cmdDoctor(backend, json)
     case 'task': {

@@ -24,7 +24,7 @@ export default function App() {
   const [weekStart, setWeekStart] = useState<0 | 1>(() => localStorage.getItem('local-calendar.week-start') === '1' ? 1 : 0)
   const [cursor, setCursor] = useState(() => DateTime.now())
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [tasksOpen, setTasksOpen] = useState(true)
+  const [tasksOpen, setTasksOpen] = useState(false)
   const [calendars, setCalendars] = useState<CalendarInfo[]>([])
   const [events, setEvents] = useState<EventInfo[]>([])
   const [tasks, setTasks] = useState<TaskInfo[]>([])

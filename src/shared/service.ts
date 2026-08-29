@@ -651,6 +651,16 @@ export class CalendarService {
     if (!cur) throw new Error(`待办不存在: ${id}`)
     const title = patch.title ?? (cur.title as string)
     const notes = patch.notes !== undefined ? patch.notes : (cur.notes as string | null)
+    let parentId = (cur.parent_id as string | null) ?? null
+    if (patch.parentId !== undefined) {
+      parentId = patch.parentId?.trim() || null
+      if (parentId) {
+        if (parentId === id) throw new Error('任务不能设为自己的子任务')
+        const parent = this.getTask(parentId)
+        if (!parent) throw new Error('父任务不存在')
+        if (parent.parentId) throw new Error('子任务暂不支持继续嵌套')
+      }
+    }
     let dueAt = cur.due_at as string | null
     if (patch.dueAt !== undefined) {
       if (patch.dueAt && !parseWhen(patch.dueAt, true)) throw new Error(`无法解析任务截止时间: "${patch.dueAt}"`)
@@ -676,8 +686,8 @@ export class CalendarService {
     }
     const exdates = (patch.dueAt !== undefined || patch.rrule !== undefined) ? [] : parseExdates(cur.exdates)
     this.db
-      .prepare('UPDATE tasks SET title = ?, notes = ?, due_at = ?, reminder_minutes = ?, priority = ?, rrule = ?, exdates = ?, status = ?, completed_at = ?, updated_at = ? WHERE id = ?')
-      .run(title, notes, dueAt, reminderMinutes, priority, rrule, JSON.stringify(exdates), status, completedAt, nowIso(), id)
+      .prepare('UPDATE tasks SET parent_id = ?, title = ?, notes = ?, due_at = ?, reminder_minutes = ?, priority = ?, rrule = ?, exdates = ?, status = ?, completed_at = ?, updated_at = ? WHERE id = ?')
+      .run(parentId, title, notes, dueAt, reminderMinutes, priority, rrule, JSON.stringify(exdates), status, completedAt, nowIso(), id)
     return this.getTask(id)
   }
 
