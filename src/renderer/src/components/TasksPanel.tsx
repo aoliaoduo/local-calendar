@@ -32,8 +32,10 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const [dragId, setDragId] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'today' | 'overdue' | 'scheduled'>('all')
   const [sortMode, setSortMode] = useState<'manual' | 'due' | 'priority' | 'created'>('due')
+  const [sortOpen, setSortOpen] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const taskAddRef = useRef<HTMLDivElement>(null)
+  const sortRef = useRef<HTMLDivElement>(null)
   const [editRrule, setEditRrule] = useState('')
 
   const load = async () => {
@@ -54,6 +56,13 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
     document.addEventListener('pointerdown', close)
     return () => document.removeEventListener('pointerdown', close)
   }, [moreOpen])
+
+  useEffect(() => {
+    if (!sortOpen) return
+    const close = (event: PointerEvent) => { if (!sortRef.current?.contains(event.target as Node)) setSortOpen(false) }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [sortOpen])
 
   useEffect(() => {
     if (!adding) return
@@ -301,7 +310,10 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
         <div className="task-filters" role="tablist" aria-label="任务筛选">
           {([['all', '全部'], ['today', '今天'], ['overdue', '逾期'], ['scheduled', '有日期']] as const).map(([key, label]) => <button key={key} className={filter === key ? 'active' : ''} onClick={() => setFilter(key)}>{label}</button>)}
         </div>
-        <label className="task-sort"><span className="material-icons">sort</span><span>排序</span><select value={sortMode} onChange={(event) => setSortMode(event.target.value as typeof sortMode)}><option value="manual">手动顺序</option><option value="due">截止日期</option><option value="priority">优先级</option><option value="created">最近创建</option></select></label>
+        <div className="task-sort-wrap" ref={sortRef}>
+          <button className={`icon-btn task-sort-button${sortOpen ? ' active' : ''}`} title="排序依据" onClick={() => setSortOpen((value) => !value)}><span className="material-icons">sort</span></button>
+          {sortOpen && <div className="task-sort-menu"><div className="task-sort-menu-title">排序依据</div>{([['manual', '我的顺序'], ['due', '日期'], ['priority', '优先级'], ['created', '最近创建']] as const).map(([key, label]) => <button key={key} className={sortMode === key ? 'active' : ''} onClick={() => { setSortMode(key); setSortOpen(false) }}>{sortMode === key && <span className="material-icons">check</span>}<span>{label}</span></button>)}</div>}
+        </div>
         {selected.size > 0 && <div className="task-bulk-bar"><span>已选 {selected.size}</span><button className="btn-text compact" onClick={() => void batchComplete()}>完成</button><button className="btn-text compact danger" onClick={() => void batchDelete()}>删除</button><button className="icon-btn compact" title="清除选择" onClick={() => setSelected(new Set())}><span className="material-icons">close</span></button></div>}
         {adding ? (
           <div ref={taskAddRef} className="task-add-form">
@@ -309,7 +321,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
             <textarea
               autoFocus
               className="task-add-title"
-              placeholder="任务标题\n描述（可选）"
+              placeholder={'任务标题\n描述（可选）'}
               value={newDraft}
               onChange={(e) => { const value = e.target.value; const lines = value.split(/\r?\n/); setNewDraft(value); setNewTitle(lines[0] ?? ''); setNewNotes(lines.slice(1).join('\n')) }}
               onKeyDown={(e) => {

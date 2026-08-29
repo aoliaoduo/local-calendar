@@ -1466,6 +1466,65 @@
 .task-filters button:hover { background: var(--hover); }
 .task-filters button.active { background: var(--blue-soft); color: var(--g-blue-text); font-weight: 500; }
 
+.task-sort-wrap {
+  position: relative;
+  margin-left: auto;
+}
+
+.task-sort-button {
+  width: 36px;
+  height: 36px;
+  color: var(--text-3);
+}
+
+.task-sort-button:hover,
+.task-sort-button.active {
+  color: var(--g-blue);
+  background: var(--blue-soft);
+}
+
+.task-sort-menu {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  z-index: 30;
+  min-width: 176px;
+  padding: 8px 0;
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--dialog-shadow);
+  animation: task-menu-in .16s ease-out;
+}
+
+.task-sort-menu-title {
+  padding: 6px 16px 8px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.task-sort-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 16px;
+  color: var(--text-2);
+  text-align: left;
+  font-size: 13px;
+}
+
+.task-sort-menu button:hover,
+.task-sort-menu button.active { background: var(--hover); color: var(--g-blue-text); }
+.task-sort-menu button .material-icons { width: 18px; font-size: 17px; color: var(--g-blue); }
+
+@keyframes task-menu-in {
+  from { opacity: 0; transform: translateY(-4px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Retained for older markup consumers. */
 .task-sort {
   display: flex;
   align-items: center;
