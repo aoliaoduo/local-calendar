@@ -5,14 +5,45 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { DateTime } from 'luxon'
 import { isReminderDue } from '../src/shared/reminders.ts'
+import { parseIcsEvents } from '../src/shared/ics.ts'
+
+const parsedIcs = parseIcsEvents(String.raw`BEGIN:VCALENDAR
+BEGIN:VEVENT
+SUMMARY:Planning\, review\; Q3
+DESCRIPTION:First line\nsecond line
+ continued
+LOCATION:Room\, A
+DTSTART:20260910T090000Z
+DTEND:20260910T100000Z
+RRULE:FREQ=WEEKLY
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:All-day planning
+DTSTART;VALUE=DATE:20260911
+END:VEVENT
+END:VCALENDAR`)
+assert.equal(parsedIcs.length, 2)
+assert.equal(parsedIcs[0].title, 'Planning, review; Q3')
+assert.equal(parsedIcs[0].description, 'First line\nsecond linecontinued')
+assert.equal(parsedIcs[0].location, 'Room, A')
+assert.equal(parsedIcs[0].start, '2026-09-10T09:00:00.000Z')
+assert.equal(parsedIcs[0].rrule, 'FREQ=WEEKLY')
+assert.equal(parsedIcs[1].isAllDay, true)
+assert.equal(parsedIcs[1].end, '2026-09-12')
 
 const dataDir = mkdtempSync(join(tmpdir(), 'local-calendar-test-'))
 process.env.LOCAL_CALENDAR_DATA_DIR = dataDir
 process.env.APPDATA = join(dataDir, 'legacy-empty')
 
-const chunk = readdirSync(resolve('out/main/chunks')).find((name) => name.startsWith('rpc-methods-') && name.endsWith('.js'))
-assert.ok(chunk, 'built service chunk not found')
-const service = await import(pathToFileURL(resolve('out/main/chunks', chunk)).href)
+let service
+for (const chunk of readdirSync(resolve('out/main/chunks')).filter((name) => name.endsWith('.js'))) {
+  const candidate = await import(pathToFileURL(resolve('out/main/chunks', chunk)).href)
+  if (candidate.CalendarService || candidate.C) {
+    service = candidate
+    break
+  }
+}
+assert.ok(service, 'built service module not found')
 const CalendarService = service.CalendarService ?? service.C
 const openDatabase = service.openDatabase ?? service.o
 const getDataDir = service.getDataDir ?? service.a

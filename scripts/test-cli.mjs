@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -40,6 +40,19 @@ try {
 
   const events = runJson('list', '-f', '2026-09-10', '-t', '2026-09-10')
   assert.equal(events.some((item) => item.id === event.id), true)
+
+  const fixture = join(dataDir, 'import.ics')
+  writeFileSync(fixture, String.raw`BEGIN:VCALENDAR
+BEGIN:VEVENT
+SUMMARY:Imported\, event
+DTSTART:20260912T090000Z
+DTEND:20260912T100000Z
+END:VEVENT
+END:VCALENDAR`)
+  const imported = runJson('import', '-i', fixture)
+  assert.equal(imported.count, 1)
+  const importedEvents = runJson('list', '-f', '2026-09-12', '-t', '2026-09-12')
+  assert.equal(importedEvents.some((item) => item.title === 'Imported, event'), true)
 
   const task = runJson('task', 'add', 'CLI', 'task', '-d', '2026-09-11', '-p', 'high', '-r', 'weekly', '--remind', '30')
   assert.equal(task.title, 'CLI task')

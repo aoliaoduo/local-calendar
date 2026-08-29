@@ -9,6 +9,7 @@ import { createMethodTable } from '../shared/rpc-methods'
 import { getDbPath, getRpcInfoPath, getDataDir } from '../shared/paths'
 import type { Task } from '../shared/types'
 import { isReminderDue } from '../shared/reminders'
+import { parseIcsEvents } from '../shared/ics'
 import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync, rmSync, readdirSync, statSync, unlinkSync } from 'node:fs'
 
 const windowStatePath = () => join(getDataDir(), 'window-state.json')
@@ -333,52 +334,10 @@ function buildTrayMenu(): Menu {
   ])
 }
 
-function importIcsValue(value: string): { value: string; allDay: boolean } | null {
-  const clean = value.trim()
-  if (/^\d{8}$/.test(clean)) {
-    const date = DateTime.fromFormat(clean, 'yyyyMMdd')
-    return date.isValid ? { value: date.toFormat('yyyy-MM-dd'), allDay: true } : null
-  }
-  const date = DateTime.fromFormat(clean.replace(/Z$/, ''), "yyyyMMdd'T'HHmmss", { zone: clean.endsWith('Z') ? 'utc' : 'local' })
-  return date.isValid ? { value: date.toISO()!, allDay: false } : null
-}
-
-function unescapeIcsValue(value: string): string {
-  return value.replace(/\\n/gi, '\n').replace(/\\([\\;,])/g, '$1')
-}
-
 function importIcsFile(path: string): number {
-  const lines: string[] = []
-  for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
-    if (/^[ \t]/.test(line) && lines.length) lines[lines.length - 1] += line.slice(1)
-    else lines.push(line)
-  }
-  let fields: Record<string, string> | null = null
-  let count = 0
-  for (const line of lines) {
-    if (line === 'BEGIN:VEVENT') fields = {}
-    else if (line === 'END:VEVENT' && fields) {
-      const start = fields.DTSTART ? importIcsValue(fields.DTSTART) : null
-      const end = fields.DTEND ? importIcsValue(fields.DTEND) : null
-      if (start && fields.SUMMARY) {
-        svc.createEvent({
-          title: unescapeIcsValue(fields.SUMMARY),
-          description: fields.DESCRIPTION ? unescapeIcsValue(fields.DESCRIPTION) : undefined,
-          location: fields.LOCATION ? unescapeIcsValue(fields.LOCATION) : undefined,
-          start: start.value,
-          end: end?.value ?? (start.allDay ? DateTime.fromISO(start.value).plus({ days: 1 }).toFormat('yyyy-MM-dd') : DateTime.fromISO(start.value).plus({ hours: 1 }).toISO()!),
-          isAllDay: start.allDay,
-          rrule: fields.RRULE || undefined
-        })
-        count++
-      }
-      fields = null
-    } else if (fields) {
-      const separator = line.indexOf(':')
-      if (separator > 0) fields[line.slice(0, separator).split(';')[0].toUpperCase()] = line.slice(separator + 1)
-    }
-  }
-  return count
+  const events = parseIcsEvents(readFileSync(path, 'utf8'))
+  for (const event of events) svc.createEvent(event)
+  return events.length
 }
 
 async function runAutoBackup(): Promise<void> {

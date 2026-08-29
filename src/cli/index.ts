@@ -5,6 +5,7 @@ import { getDataDir, getDbPath, getRpcInfoPath, type RpcInfo } from '../shared/p
 import { openDatabase } from '../shared/db'
 import { CalendarService } from '../shared/service'
 import { createMethodTable, type MethodTable } from '../shared/rpc-methods'
+import { parseIcsEvents } from '../shared/ics'
 import type { Calendar, CalendarEvent, Task } from '../shared/types'
 
 if (!process.env.LOCAL_CALENDAR_PACKAGE_DIR && process.argv[1]) {
@@ -206,20 +207,6 @@ async function cmdExport(backend: Backend, flags: Record<string, string | true>,
   console.log(`已导出 ${events.length} 条日程 → ${output}`)
 }
 
-function icsUnescape(value: string): string {
-  return value.replace(/\\n/gi, '\n').replace(/\\([\\;,])/g, '$1')
-}
-
-function parseIcsDate(value: string): { value: string; allDay: boolean } | null {
-  const clean = value.trim()
-  if (/^\d{8}$/.test(clean)) {
-    const date = DateTime.fromFormat(clean, 'yyyyMMdd')
-    return date.isValid ? { value: date.toFormat('yyyy-MM-dd'), allDay: true } : null
-  }
-  const date = DateTime.fromFormat(clean.replace(/Z$/, ''), "yyyyMMdd'T'HHmmss", { zone: clean.endsWith('Z') ? 'utc' : 'local' })
-  return date.isValid ? { value: date.toISO()!, allDay: false } : null
-}
-
 async function cmdImport(backend: Backend, flags: Record<string, string | true>, json: boolean): Promise<void> {
   const input = str(flags, 'in')
   if (!input) throw new CliError('缺少输入文件。用法: import -i calendar.ics')
@@ -229,45 +216,9 @@ async function cmdImport(backend: Backend, flags: Record<string, string | true>,
   } catch {
     throw new CliError(`无法读取 ICS 文件: ${input}`)
   }
-  const unfolded: string[] = []
-  for (const line of content.split(/\r?\n/)) {
-    if (/^[ \t]/.test(line) && unfolded.length) unfolded[unfolded.length - 1] += line.slice(1)
-    else unfolded.push(line)
-  }
   const imported: CalendarEvent[] = []
-  let fields: Record<string, string> | null = null
-  for (const line of unfolded) {
-    if (line === 'BEGIN:VEVENT') fields = {}
-    else if (line === 'END:VEVENT' && fields) {
-      const startRaw = fields.DTSTART
-      const endRaw = fields.DTEND
-      const start = startRaw ? parseIcsDate(startRaw) : null
-      const end = endRaw ? parseIcsDate(endRaw) : null
-      if (start && fields.SUMMARY) {
-        const allDay = start.allDay
-        const endValue = end
-          ? allDay
-            ? end.value
-            : end.value
-          : allDay
-            ? DateTime.fromISO(start.value).plus({ days: 1 }).toFormat('yyyy-MM-dd')
-            : DateTime.fromISO(start.value).plus({ hours: 1 }).toISO()!
-        const event = await backend.call<CalendarEvent>('events.create', {
-          title: icsUnescape(fields.SUMMARY),
-          description: fields.DESCRIPTION ? icsUnescape(fields.DESCRIPTION) : undefined,
-          location: fields.LOCATION ? icsUnescape(fields.LOCATION) : undefined,
-          start: start.value,
-          end: endValue,
-          isAllDay: allDay,
-          rrule: fields.RRULE || undefined
-        })
-        imported.push(event)
-      }
-      fields = null
-    } else if (fields) {
-      const separator = line.indexOf(':')
-      if (separator > 0) fields[line.slice(0, separator).split(';')[0].toUpperCase()] = line.slice(separator + 1)
-    }
+  for (const inputEvent of parseIcsEvents(content)) {
+    imported.push(await backend.call<CalendarEvent>('events.create', { ...inputEvent }))
   }
   if (json) return emitJson({ count: imported.length, events: imported })
   console.log(`已导入 ${imported.length} 条日程`)
