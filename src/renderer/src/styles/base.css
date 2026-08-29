@@ -192,6 +192,11 @@ select {
 }
 
 .window-drag-region {
+  display: none;
+}
+
+.topbar::after {
+  content: '';
   position: absolute;
   inset: 0;
   -webkit-app-region: drag;
@@ -202,6 +207,8 @@ select {
   position: relative;
   z-index: 1;
 }
+
+.topbar > *:not(.window-drag-region) { -webkit-app-region: no-drag; }
 
 .topbar button,
 .topbar input,
@@ -939,6 +946,7 @@ select {
   border-radius: 4px;
   transition: background-color 0.16s ease, transform 0.16s ease;
   box-shadow: var(--calendar-row-shadow);
+  overflow: visible;
 }
 
 .cal-row-wrap .cal-row {
@@ -1448,4 +1456,13 @@ select {
 :root[data-theme='dark'] .cal-row,
 :root[data-theme='dark'] .cal-row-more {
   box-shadow: none;
+}
+
+:root[data-theme='dark'] .cal-row-wrap {
+  box-shadow: var(--calendar-row-shadow);
+  background: color-mix(in srgb, var(--surface) 88%, #ffffff 12%);
+}
+
+:root[data-theme='dark'] .cal-row-wrap:hover {
+  background: var(--hover);
 }

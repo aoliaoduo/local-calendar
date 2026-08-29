@@ -46,6 +46,17 @@ export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, o
     return () => document.removeEventListener('pointerdown', close)
   }, [addingCalendar])
 
+  useEffect(() => {
+    const close = () => {
+      if (!addingCalendar) return
+      setAddingCalendar(false)
+      setNewCalendarName('')
+      setCalendarError('')
+    }
+    document.addEventListener('calendar-transient-dismiss', close)
+    return () => document.removeEventListener('calendar-transient-dismiss', close)
+  }, [addingCalendar])
+
   const myCals = calendars.filter((c) => !['holidays'].includes(c.id))
   const otherCals = calendars.filter((c) => c.id === 'holidays')
 

@@ -91,7 +91,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    void loadBootstrap()
+    void loadBootstrap().catch((error) => setToast(error instanceof Error ? error.message : '加载日历数据失败'))
   }, [loadBootstrap])
 
   useEffect(() => {
@@ -148,10 +148,15 @@ export default function App() {
 
   useEffect(() => {
     const off = window.calendarApi.onDataChanged(() => {
-      void loadBootstrap()
+      void loadBootstrap().catch((error) => setToast(error instanceof Error ? error.message : '刷新日历数据失败'))
     })
     return off
   }, [loadBootstrap])
+
+  useEffect(() => window.calendarApi.onTitlebarPointerDown(() => {
+    if (dialog?.mode === 'create') setDialog(null)
+    document.dispatchEvent(new Event('calendar-transient-dismiss'))
+  }), [dialog])
 
   useEffect(() => window.calendarApi.onAppToast((payload) => {
     const item: AppToastInfo = typeof payload === 'string' ? { message: payload } : payload
@@ -188,6 +193,18 @@ export default function App() {
     if (image) localStorage.setItem('local-calendar.avatar-image', image)
     else localStorage.removeItem('local-calendar.avatar-image')
     void window.calendarApi.setProfile({ username, avatarColor, avatarImage: image })
+  }
+
+  const saveProfile = (nextUsername: string, nextAvatarColor: string, nextAvatarImage: string | null) => {
+    const normalizedName = nextUsername.trim() || '本地用户'
+    setUsername(normalizedName)
+    setAvatarColor(nextAvatarColor)
+    setAvatarImage(nextAvatarImage)
+    localStorage.setItem('local-calendar.username', normalizedName)
+    localStorage.setItem('local-calendar.avatar-color', nextAvatarColor)
+    if (nextAvatarImage) localStorage.setItem('local-calendar.avatar-image', nextAvatarImage)
+    else localStorage.removeItem('local-calendar.avatar-image')
+    void window.calendarApi.setProfile({ username: normalizedName, avatarColor: nextAvatarColor, avatarImage: nextAvatarImage })
   }
 
   const dates = useMemo(() => {
@@ -286,7 +303,11 @@ export default function App() {
       const taskId = id.slice('task-'.length).replace(/#\d+$/, '')
       const task = tasks.find((item) => item.id === taskId)
       if (task) {
-        void api.updateTask(task.id, { dueAt: start.toISODate() }).then(() => { void loadTasks(); setToast('已更新任务截止日期') }).catch((err) => setToast(err instanceof Error ? err.message : '更新任务失败'))
+        const occurrenceMatch = id.match(/#(\d+)$/)
+        const save = occurrenceMatch
+          ? api.updateTaskOccurrence(task.id, Number(occurrenceMatch[1]), { dueAt: start.toISODate() })
+          : api.updateTask(task.id, { dueAt: start.toISODate() })
+        void save.then(() => { void loadBootstrap(); setToast(occurrenceMatch ? '已更新此任务实例' : '已更新任务截止日期') }).catch((err) => setToast(err instanceof Error ? err.message : '更新任务失败'))
       }
       return
     }
@@ -469,7 +490,7 @@ export default function App() {
       {helpOpen && <HelpDialog calendars={calendars} onClose={() => setHelpOpen(false)} />}
       {recycleOpen && <RecycleBinDialog onClose={() => setRecycleOpen(false)} onToast={setToast} />}
       {appearanceOpen && <AppearanceDialog theme={theme} onThemeChange={setTheme} onClose={() => setAppearanceOpen(false)} />}
-      {profileOpen && <ProfileDialog username={username} avatarColor={avatarColor} avatarImage={avatarImage} onSave={(name, color, image) => { updateProfile(name, color); updateAvatarImage(image); setProfileOpen(false) }} onClose={() => setProfileOpen(false)} />}
+      {profileOpen && <ProfileDialog username={username} avatarColor={avatarColor} avatarImage={avatarImage} onSave={(name, color, image) => { saveProfile(name, color, image); setProfileOpen(false) }} onClose={() => setProfileOpen(false)} />}
       {calendarToEdit && <CalendarEditDialog calendar={calendarToEdit} onSave={(patch) => handleCalendarUpdate(calendarToEdit.id, patch)} onClose={() => setCalendarToEdit(null)} />}
       {taskToEdit && <TaskDialog task={taskToEdit} occurrenceIndex={taskOccurrenceIndex} occurrenceDue={taskOccurrenceDue} onClose={() => { setTaskToEdit(null); setTaskOccurrenceIndex(undefined); setTaskOccurrenceDue(undefined) }} onSaved={(message) => { setTaskToEdit(null); setTaskOccurrenceIndex(undefined); setTaskOccurrenceDue(undefined); setToast(message); void loadTasks(); void loadTaskOccurrences() }} />}
 

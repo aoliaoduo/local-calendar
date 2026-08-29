@@ -108,7 +108,7 @@ export default function TopBar({
   }
 
   return (
-    <header className="topbar" onPointerDown={() => onTransientDismiss?.()} onContextMenu={(event) => event.preventDefault()}>
+    <header className="topbar" onPointerDownCapture={() => { onTransientDismiss?.(); document.dispatchEvent(new Event('calendar-transient-dismiss')) }} onContextMenu={(event) => event.preventDefault()}>
       <div className="window-drag-region" />
       <button className="icon-btn" title="主菜单" onClick={onToggleSidebar}>
         <span className="material-icons">menu</span>

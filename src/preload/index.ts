@@ -8,6 +8,11 @@ contextBridge.exposeInMainWorld('calendarApi', {
     ipcRenderer.on('data-changed', listener)
     return () => ipcRenderer.removeListener('data-changed', listener)
   },
+  onTitlebarPointerDown: (callback: () => void) => {
+    const listener = () => callback()
+    ipcRenderer.on('titlebar-pointerdown', listener)
+    return () => ipcRenderer.removeListener('titlebar-pointerdown', listener)
+  },
   onAppToast: (callback: (payload: { message: string; kind?: 'event' | 'task'; id?: string } | string) => void) => {
     const listener = (_e: unknown, payload: { message: string; kind?: 'event' | 'task'; id?: string } | string) => callback(payload)
     ipcRenderer.on('app-toast', listener)

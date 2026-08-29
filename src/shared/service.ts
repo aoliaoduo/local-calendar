@@ -342,12 +342,14 @@ export class CalendarService {
 
   createEvent(input: CreateEventInput): CalendarEvent {
     const start = parseWhen(input.start)
+    if (input.end && !parseWhen(input.end)) throw new Error(`无法解析结束时间: "${input.end}"`)
     let end = input.end ? parseWhen(input.end) : null
     if (!start) throw new Error(`无法解析开始时间: "${input.start}"（支持 ISO 8601，如 2026-08-28T14:00:00 或 2026-08-28）`)
     const isAllDay = input.isAllDay ?? /^\d{4}-\d{2}-\d{2}$/.test(input.start.trim())
     if (!end) end = isAllDay ? start.endOf('day') : start.plus({ hours: 1 })
     if (end <= start) throw new Error('结束时间必须晚于开始时间')
-    const calId = input.calendarId && this.getCalendar(input.calendarId) ? input.calendarId : 'personal'
+    if (input.calendarId && !this.getCalendar(input.calendarId)) throw new Error(`日历不存在: ${input.calendarId}`)
+    const calId = input.calendarId || 'personal'
     if (calId === HOLIDAY_CALENDAR_ID) throw new Error('中国节假日为内置只读日历，不能写入')
     const reminders = normalizeReminders(input.reminders)
     const rrule = input.rrule?.trim() || null
@@ -558,6 +560,7 @@ export class CalendarService {
   // ---------- tasks ----------
 
   createTask(input: CreateTaskInput): Task {
+    if (input.dueAt && !parseWhen(input.dueAt, true)) throw new Error(`无法解析任务截止时间: "${input.dueAt}"`)
     const due = input.dueAt ? parseWhen(input.dueAt, true) : null
     const rrule = input.rrule?.trim() || null
     if (rrule && !parseRule(rrule)) throw new Error(`无法解析任务重复规则: "${input.rrule}"`)
@@ -608,6 +611,7 @@ export class CalendarService {
     const notes = patch.notes !== undefined ? patch.notes : (cur.notes as string | null)
     let dueAt = cur.due_at as string | null
     if (patch.dueAt !== undefined) {
+      if (patch.dueAt && !parseWhen(patch.dueAt, true)) throw new Error(`无法解析任务截止时间: "${patch.dueAt}"`)
       const d = patch.dueAt ? parseWhen(patch.dueAt, true) : null
       dueAt = d ? d.toUTC().toISO() : null
     }

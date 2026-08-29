@@ -13,6 +13,7 @@ export interface AppToastInfo {
 interface CalendarApi {
   call: (method: string, params: Record<string, unknown>) => Promise<RpcResult<unknown>>
   onDataChanged: (callback: (payload: { method: string }) => void) => () => void
+  onTitlebarPointerDown: (callback: () => void) => () => void
   onAppToast: (callback: (payload: AppToastInfo | string) => void) => () => void
   windowMinimize: () => void
   windowToggleMaximize: () => void

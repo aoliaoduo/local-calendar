@@ -191,6 +191,11 @@ function createWindow(): void {
     win.hide()
   })
   win.on('system-context-menu', (event) => event.preventDefault())
+  win.webContents.on('before-input-event', (_event, input) => {
+    if (input.type === 'mouseDown' && (input as Electron.Input & { y?: number }).y !== undefined && (input as Electron.Input & { y?: number }).y! < 68) {
+      win.webContents.send('titlebar-pointerdown')
+    }
+  })
   win.on('resize', () => saveWindowState(win))
   win.on('move', () => saveWindowState(win))
   win.on('maximize', () => saveWindowState(win))
@@ -245,7 +250,7 @@ function buildTrayMenu(): Menu {
       label: task.dueAt ? `${task.title}（${DateTime.fromISO(task.dueAt).toLocal().toFormat('M月d日')}）` : task.title,
       click: () => focusTarget('task', task.id)
     }))
-    overdueItems = svc.listTasks({ status: 'needsAction', dueBefore: today }).sort((a, b) => (a.dueAt || '').localeCompare(b.dueAt || '')).slice(0, 8).map((task) => ({
+    overdueItems = svc.listTaskOccurrences(DateTime.now().minus({ years: 2 }).toFormat('yyyy-MM-dd'), today).filter((task) => task.status === 'needsAction' && task.dueAt && DateTime.fromISO(task.dueAt).toLocal().toISODate()! < today).sort((a, b) => (a.dueAt || '').localeCompare(b.dueAt || '')).slice(0, 8).map((task) => ({
       label: task.dueAt ? `${task.title}（${DateTime.fromISO(task.dueAt).toLocal().toFormat('M月d日')}）` : task.title,
       click: () => focusTarget('task', task.id)
     }))
@@ -350,7 +355,7 @@ function fireReminder(evtTitle: string, when: DateTime, leadMin: number, eventId
 function fireTaskReminder(taskTitle: string, dueAt: DateTime, leadMin: number, taskId?: string): void {
   if (!readNotificationPreferences().notificationsEnabled) return
   const timeLabel = dueAt.toFormat('HH:mm')
-  const body = leadMin > 0 ? `截止 ${timeLabel}（提前 ${leadMin} 分钟提醒）` : `截止 ${timeLabel}`
+  const body = leadMin === 900 ? `截止日期当天 09:00 提醒（截止 ${timeLabel}）` : leadMin > 0 ? `截止 ${timeLabel}（提前 ${leadMin} 分钟提醒）` : `截止 ${timeLabel}`
   try {
     const n = new Notification({ title: `任务：${taskTitle}`, body })
     n.on('click', () => taskId ? focusTarget('task', taskId) : BrowserWindow.getAllWindows()[0]?.show())

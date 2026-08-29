@@ -1694,6 +1694,21 @@
   width: calc(100% - 32px);
 }
 
+.task-add-form .task-add-notes {
+  min-height: 58px;
+  resize: vertical;
+  border: 1px solid var(--divider);
+  border-radius: 6px;
+  padding: 7px 8px;
+  background: transparent;
+  color: var(--text-1);
+  font-size: 13px;
+  line-height: 1.45;
+  position: relative;
+  left: 32px;
+  width: calc(100% - 32px);
+}
+
 .task-add-form .task-add-title {
   min-height: 58px;
   resize: vertical;
