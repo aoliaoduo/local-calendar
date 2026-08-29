@@ -161,6 +161,10 @@ export default function App() {
     setCalendarToEdit(null)
     setProfileOpen(false)
     setAgendaDay(null)
+    setSettingsOpen(false)
+    setAppearanceOpen(false)
+    setHelpOpen(false)
+    setRecycleOpen(false)
     document.dispatchEvent(new Event('calendar-transient-dismiss'))
   }), [dialog])
 
