@@ -9,14 +9,24 @@ import { createMethodTable } from '../shared/rpc-methods'
 import { getDbPath, getRpcInfoPath, getDataDir } from '../shared/paths'
 import type { Task } from '../shared/types'
 import { isReminderDue } from '../shared/reminders'
-import { existsSync, copyFileSync, readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, statSync, unlinkSync } from 'node:fs'
+import { existsSync, copyFileSync, readFileSync, writeFileSync, renameSync, mkdirSync, rmSync, readdirSync, statSync, unlinkSync } from 'node:fs'
 
 const windowStatePath = () => join(getDataDir(), 'window-state.json')
 const preferencesPath = () => join(getDataDir(), 'preferences.json')
 interface NotificationPreferences { notificationsEnabled: boolean }
 interface UserPreferences extends NotificationPreferences { username?: string; avatarColor?: string; avatarImage?: string | null }
 function readPreferences(): UserPreferences {
-  try { return JSON.parse(readFileSync(preferencesPath(), 'utf8')) as UserPreferences } catch { return { notificationsEnabled: true } }
+  try {
+    const value = JSON.parse(readFileSync(preferencesPath(), 'utf8')) as Partial<UserPreferences>
+    return {
+      notificationsEnabled: value.notificationsEnabled !== false,
+      username: typeof value.username === 'string' ? value.username : undefined,
+      avatarColor: typeof value.avatarColor === 'string' ? value.avatarColor : undefined,
+      avatarImage: typeof value.avatarImage === 'string' ? value.avatarImage : null
+    }
+  } catch {
+    return { notificationsEnabled: true }
+  }
 }
 function readNotificationPreferences(): NotificationPreferences {
   return { notificationsEnabled: readPreferences().notificationsEnabled !== false }
@@ -29,8 +39,14 @@ function saveWindowState(win: BrowserWindow): void {
   try {
     const bounds = win.isMaximized() ? undefined : win.getBounds()
     const previous = readWindowState()
-    writeFileSync(windowStatePath(), JSON.stringify({ ...previous, ...(bounds ?? {}), maximized: win.isMaximized() }, null, 2))
+    writeJsonAtomic(windowStatePath(), { ...previous, ...(bounds ?? {}), maximized: win.isMaximized() })
   } catch { /* 状态保存失败不影响应用 */ }
+}
+
+function writeJsonAtomic(path: string, value: unknown): void {
+  const tempPath = `${path}.${process.pid}.tmp`
+  writeFileSync(tempPath, JSON.stringify(value, null, 2), 'utf8')
+  renameSync(tempPath, path)
 }
 let windowStateTimer: NodeJS.Timeout | null = null
 function scheduleWindowStateSave(win: BrowserWindow): void {
@@ -136,11 +152,17 @@ function startRpcServer(getWindows: () => BrowserWindow[]): void {
       return
     }
     let body = ''
+    let tooLarge = false
     req.on('data', (chunk) => {
       body += chunk
-      if (body.length > 1_000_000) req.destroy()
+      if (body.length > 1_000_000) tooLarge = true
     })
     req.on('end', async () => {
+      if (tooLarge) {
+        res.writeHead(413, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: false, error: 'request body too large' }))
+        return
+      }
       let method = ''
       let params: Record<string, unknown> = {}
       try {
@@ -448,7 +470,7 @@ app.whenReady().then(() => {
   ipcMain.handle('notification-settings:get', () => readNotificationPreferences())
   ipcMain.handle('notification-settings:set', (_event, enabled: boolean) => {
     const preferences = { ...readPreferences(), notificationsEnabled: enabled !== false }
-    writeFileSync(preferencesPath(), JSON.stringify(preferences, null, 2))
+    writeJsonAtomic(preferencesPath(), preferences)
     return preferences
   })
   ipcMain.handle('profile:get', () => {
@@ -457,7 +479,7 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('profile:set', (_event, profile: { username?: string; avatarColor?: string; avatarImage?: string | null }) => {
     const preferences = { ...readPreferences(), username: profile.username?.trim() || '本地用户', avatarColor: profile.avatarColor || '#4285f4', avatarImage: profile.avatarImage || null }
-    writeFileSync(preferencesPath(), JSON.stringify(preferences, null, 2))
+    writeJsonAtomic(preferencesPath(), preferences)
     return { username: preferences.username, avatarColor: preferences.avatarColor, avatarImage: preferences.avatarImage }
   })
   ipcMain.handle('print-calendar', async (event) => {

@@ -112,6 +112,7 @@ function probeApp(): RpcInfo | null {
 // ---------- 参数解析 ----------
 
 const SHORT_TO_LONG: Record<string, string> = {
+  h: 'help',
   s: 'start',
   e: 'end',
   c: 'calendar',
@@ -126,7 +127,7 @@ const SHORT_TO_LONG: Record<string, string> = {
   i: 'in'
 }
 const VALUE_FLAGS = new Set(['start', 'end', 'calendar', 'location', 'note', 'due', 'from', 'to', 'title', 'repeat', 'remind', 'priority', 'out', 'in'])
-const BOOL_FLAGS = new Set(['all-day', 'all', 'done', 'today', 'overdue', 'scheduled', 'json'])
+const BOOL_FLAGS = new Set(['all-day', 'all', 'done', 'today', 'overdue', 'scheduled', 'json', 'help'])
 
 const REPEAT_MAP: Record<string, string> = {
   daily: 'DAILY',
@@ -294,7 +295,8 @@ function parseArgs(argv: string[]): ParsedArgs {
     } else if (a.startsWith('-') && a.length === 2) {
       const key = SHORT_TO_LONG[a.slice(1)]
       if (!key) throw new CliError(`未知选项: ${a}（localcal help 查看用法）`)
-      flags[key] = argv[++i] ?? ''
+      if (BOOL_FLAGS.has(key)) flags[key] = true
+      else flags[key] = argv[++i] ?? ''
     } else {
       positional.push(a)
     }
@@ -648,10 +650,13 @@ async function main(): Promise<void> {
   const argv = process.argv.slice(2)
   if (!argv.length) {
     console.log(HELP)
-    process.exitCode = 1
     return
   }
   const { flags, positional } = parseArgs(argv)
+  if (flags.help === true) {
+    console.log(HELP)
+    return
+  }
   const json = flags.json === true
   const [cmd, ...rest] = positional
   const backend = new Backend()

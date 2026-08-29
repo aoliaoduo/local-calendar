@@ -179,21 +179,6 @@ export default function App() {
     localStorage.setItem('local-calendar.default-view', nextView)
   }
 
-  const updateProfile = (nextUsername: string, nextAvatarColor: string) => {
-    setUsername(nextUsername.trim() || '本地用户')
-    setAvatarColor(nextAvatarColor)
-    localStorage.setItem('local-calendar.username', nextUsername.trim() || '本地用户')
-    localStorage.setItem('local-calendar.avatar-color', nextAvatarColor)
-    void window.calendarApi.setProfile({ username: nextUsername, avatarColor: nextAvatarColor, avatarImage })
-  }
-
-  const updateAvatarImage = (image: string | null) => {
-    setAvatarImage(image)
-    if (image) localStorage.setItem('local-calendar.avatar-image', image)
-    else localStorage.removeItem('local-calendar.avatar-image')
-    void window.calendarApi.setProfile({ username, avatarColor, avatarImage: image })
-  }
-
   const saveProfile = (nextUsername: string, nextAvatarColor: string, nextAvatarImage: string | null) => {
     const normalizedName = nextUsername.trim() || '本地用户'
     setUsername(normalizedName)

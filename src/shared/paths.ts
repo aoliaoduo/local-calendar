@@ -1,4 +1,4 @@
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 
 export const APP_DIR_NAME = 'local-calendar'
@@ -9,30 +9,36 @@ export function getDataDir(): string {
   const packageDir = process.env.LOCAL_CALENDAR_PACKAGE_DIR?.trim() || findPackageDir()
   const localDir = join(packageDir, 'data')
   const dir = explicitDir
-    ? explicitDir
+    ? resolve(explicitDir)
     : portableDir
-      ? join(portableDir, 'data')
+      ? join(resolve(portableDir), 'data')
       : localDir
   mkdirSync(dir, { recursive: true })
-  const legacyDir = join(process.env.APPDATA || '', APP_DIR_NAME)
-  if (dir !== legacyDir && !existsSync(join(dir, 'calendar.db')) && existsSync(join(legacyDir, 'calendar.db'))) {
-    copyFileSync(join(legacyDir, 'calendar.db'), join(dir, 'calendar.db'))
-    for (const suffix of ['-wal', '-shm']) {
-      if (existsSync(join(legacyDir, `calendar.db${suffix}`))) copyFileSync(join(legacyDir, `calendar.db${suffix}`), join(dir, `calendar.db${suffix}`))
-    }
-  }
+  migrateLegacyData(dir)
   return dir
 }
 
 function findPackageDir(): string {
-  let dir = process.cwd()
-  for (let depth = 0; depth < 5; depth++) {
-    if (dir.endsWith('local-calendar') || dir.endsWith('20260828003809')) return dir
+  let dir = resolve(process.cwd())
+  for (let depth = 0; depth < 8; depth++) {
+    if (existsSync(join(dir, 'package.json')) && (existsSync(join(dir, 'src')) || existsSync(join(dir, 'out')))) return dir
     const parent = dirname(dir)
     if (parent === dir) break
     dir = parent
   }
   return process.cwd()
+}
+
+function migrateLegacyData(targetDir: string): void {
+  const appData = process.env.APPDATA?.trim()
+  if (!appData) return
+  const legacyDir = resolve(appData, APP_DIR_NAME)
+  if (resolve(targetDir) === legacyDir || existsSync(join(targetDir, 'calendar.db')) || !existsSync(join(legacyDir, 'calendar.db'))) return
+  copyFileSync(join(legacyDir, 'calendar.db'), join(targetDir, 'calendar.db'))
+  for (const suffix of ['-wal', '-shm']) {
+    const source = join(legacyDir, `calendar.db${suffix}`)
+    if (existsSync(source)) copyFileSync(source, join(targetDir, `calendar.db${suffix}`))
+  }
 }
 
 export function getDbPath(): string {

@@ -39,8 +39,22 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const taskListRef = useRef<HTMLDivElement>(null)
   const [editRrule, setEditRrule] = useState('')
 
+  const resetAddForm = () => {
+    setAdding(false)
+    setNewTitle('')
+    setNewNotes('')
+    setNewDue(today)
+    setNewReminder('900')
+    setNewPriority('0')
+    setNewRrule('')
+  }
+
   const load = async () => {
-    setTasks(await api.listTasks('all'))
+    try {
+      setTasks(await api.listTasks('all'))
+    } catch (error) {
+      onToast(error instanceof Error ? error.message : '加载任务失败')
+    }
   }
 
   useEffect(() => {
@@ -50,53 +64,21 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   }, [])
 
   useEffect(() => {
-    if (!moreOpen) return
+    if (!moreOpen && !taskListOpen && !sortOpen && !adding) return
     const close = (event: PointerEvent) => {
-      if (!moreMenuRef.current?.contains(event.target as Node)) setMoreOpen(false)
+      const target = event.target as Node
+      if (moreOpen && !moreMenuRef.current?.contains(target)) setMoreOpen(false)
+      if (taskListOpen && !taskListRef.current?.contains(target)) setTaskListOpen(false)
+      if (sortOpen && !sortRef.current?.contains(target)) setSortOpen(false)
+      if (adding && !taskAddRef.current?.contains(target)) resetAddForm()
     }
     document.addEventListener('pointerdown', close)
     return () => document.removeEventListener('pointerdown', close)
-  }, [moreOpen])
-
-  useEffect(() => {
-    if (!taskListOpen) return
-    const close = (event: PointerEvent) => { if (!taskListRef.current?.contains(event.target as Node)) setTaskListOpen(false) }
-    document.addEventListener('pointerdown', close)
-    return () => document.removeEventListener('pointerdown', close)
-  }, [taskListOpen])
-
-  useEffect(() => {
-    if (!sortOpen) return
-    const close = (event: PointerEvent) => { if (!sortRef.current?.contains(event.target as Node)) setSortOpen(false) }
-    document.addEventListener('pointerdown', close)
-    return () => document.removeEventListener('pointerdown', close)
-  }, [sortOpen])
-
-  useEffect(() => {
-    if (!adding) return
-    const close = (event: PointerEvent) => {
-      if (!taskAddRef.current?.contains(event.target as Node)) {
-        setAdding(false)
-        setNewTitle('')
-        setNewNotes('')
-        setNewDue(today)
-        setNewReminder('900')
-        setNewRrule('')
-      }
-    }
-    document.addEventListener('pointerdown', close)
-    return () => document.removeEventListener('pointerdown', close)
-  }, [adding, today])
+  }, [moreOpen, taskListOpen, sortOpen, adding, today])
 
   useEffect(() => {
     const close = () => {
-      if (!adding) return
-      setAdding(false)
-      setNewTitle('')
-      setNewNotes('')
-      setNewDue(today)
-      setNewReminder('900')
-      setNewRrule('')
+      if (adding) resetAddForm()
     }
     document.addEventListener('calendar-transient-dismiss', close)
     return () => document.removeEventListener('calendar-transient-dismiss', close)
@@ -105,16 +87,14 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const handleAdd = async () => {
     const title = newTitle.trim()
     if (!title) return
-    await api.createTask({ title, notes: newNotes.trim() || undefined, dueAt: newDue || undefined, reminderMinutes: !newDue ? null : (newReminder === '' ? null : Number(newReminder)), priority: Number(newPriority), rrule: newRrule || null })
-    setNewTitle('')
-    setNewNotes('')
-    setNewDue(today)
-    setNewReminder('900')
-    setNewPriority('0')
-    setNewRrule('')
-    setAdding(false)
-    onToast('已添加任务')
-    void load()
+    try {
+      await api.createTask({ title, notes: newNotes.trim() || undefined, dueAt: newDue || undefined, reminderMinutes: !newDue ? null : (newReminder === '' ? null : Number(newReminder)), priority: Number(newPriority), rrule: newRrule || null })
+      resetAddForm()
+      onToast('已添加任务')
+      await load()
+    } catch (error) {
+      onToast(error instanceof Error ? error.message : '添加任务失败')
+    }
   }
 
   const startEdit = (task: TaskInfo) => {
@@ -255,7 +235,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
           className={`task-check${t.status === 'completed' ? ' done' : ''}`}
           title={t.status === 'completed' ? '标记为未完成' : '标记为已完成'}
           onClick={() => {
-            void api.updateTask(t.id, { completed: t.status !== 'completed' }).then(load)
+            void api.updateTask(t.id, { completed: t.status !== 'completed' }).then(() => load()).catch((error) => onToast(error instanceof Error ? error.message : '更新任务失败'))
           }}
         >
           {t.status === 'completed' && <span className="material-icons">check</span>}
@@ -304,8 +284,8 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
           onClick={() => {
             void api.deleteTask(t.id).then(() => {
               onToast('已删除任务')
-              void load()
-            })
+              return load()
+            }).catch((error) => onToast(error instanceof Error ? error.message : '删除任务失败'))
           }}
         >
           <span className="material-icons">delete_outline</span>
@@ -333,7 +313,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
         <div className="task-add-bar" ref={moreMenuRef}>
           <button className="task-add-trigger" onClick={() => setAdding(true)}><span className="material-icons">add_task</span><span>添加任务</span></button>
           <button className={`icon-btn task-more-button${moreOpen ? ' active' : ''}`} title="更多" onClick={() => setMoreOpen((value) => !value)}><span className="material-icons">more_vert</span></button>
-          {moreOpen && <div className="tasks-more-menu"><button onClick={() => { setMoreOpen(false); setSearchOpen(true) }}><span className="material-icons">search</span>搜索任务</button><button onClick={() => { setMoreOpen(false); setSortOpen((value) => !value) }}><span className="material-icons">sort</span>排序任务</button><button onClick={() => { void Promise.all(done.map((task) => api.deleteTask(task.id))).then(() => { onToast('已清除已完成任务'); setMoreOpen(false); return load() }) }} disabled={done.length === 0}><span className="material-icons">cleaning_services</span>清除已完成任务</button></div>}
+          {moreOpen && <div className="tasks-more-menu"><button onClick={() => { setMoreOpen(false); setSearchOpen(true) }}><span className="material-icons">search</span>搜索任务</button><button onClick={() => { setMoreOpen(false); setSortOpen((value) => !value) }}><span className="material-icons">sort</span>排序任务</button><button onClick={() => { void Promise.all(done.map((task) => api.deleteTask(task.id))).then(() => { onToast('已清除已完成任务'); setMoreOpen(false); return load() }).catch((error) => onToast(error instanceof Error ? error.message : '清除已完成任务失败')) }} disabled={done.length === 0}><span className="material-icons">cleaning_services</span>清除已完成任务</button></div>}
         </div>
         <div className="task-filters" role="tablist" aria-label="任务筛选">
           {([['all', '全部'], ['today', '今天'], ['overdue', '逾期'], ['scheduled', '有日期']] as const).map(([key, label]) => <button key={key} className={filter === key ? 'active' : ''} onClick={() => setFilter(key)}>{label}</button>)}
