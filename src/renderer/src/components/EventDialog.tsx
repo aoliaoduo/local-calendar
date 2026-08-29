@@ -102,6 +102,7 @@ export default function EventDialog({ state, calendars, onClose, onSaved, onCrea
   const [error, setError] = useState('')
   const [createTask, setCreateTask] = useState(false)
   const [createKind, setCreateKind] = useState<'event' | 'task'>('event')
+  const [submitting, setSubmitting] = useState(false)
 
   if (!state) return null
   const detailed = state.mode === 'create' && state.detailed === true
@@ -113,9 +114,15 @@ export default function EventDialog({ state, calendars, onClose, onSaved, onCrea
   }
 
   const handleSave = async () => {
+    if (submitting) return
+    setSubmitting(true)
+    setError('')
     try {
       if (!editing && createTask) {
-        if (!title.trim()) return
+        if (!title.trim()) {
+          setError('请填写任务标题')
+          return
+        }
         const dueAt = allDay ? start : DateTime.fromISO(start).toISO()!
         if (!onCreateTask) throw new Error('任务创建入口不可用')
         await onCreateTask({ title: title.trim(), notes: description.trim(), dueAt, reminderMinutes: allDay ? 900 : 0 })
@@ -154,11 +161,15 @@ export default function EventDialog({ state, calendars, onClose, onSaved, onCrea
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败')
+    } finally {
+      setSubmitting(false)
     }
   }
 
   const handleDelete = async () => {
-    if (!editing) return
+    if (!editing || submitting) return
+    setSubmitting(true)
+    setError('')
     try {
       if (state.occurrenceIndex !== undefined && editScope === 'occurrence') await api.deleteEventOccurrence(existing!.id, state.occurrenceIndex)
       else await api.deleteEvent(existing!.id)
@@ -166,6 +177,8 @@ export default function EventDialog({ state, calendars, onClose, onSaved, onCrea
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : '删除失败')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -187,7 +200,7 @@ export default function EventDialog({ state, calendars, onClose, onSaved, onCrea
   }
 
   return (
-    <div className="dlg-mask" onMouseDown={onClose}>
+    <div className="dlg-mask" onMouseDown={() => { if (!submitting) onClose() }}>
       <div className={`dlg${detailed ? ' dlg-detailed' : ''}`} onMouseDown={(e) => e.stopPropagation()}>
         <input
           className="dlg-title"
@@ -329,17 +342,17 @@ export default function EventDialog({ state, calendars, onClose, onSaved, onCrea
         <div className="dlg-actions">
           <div className="left">
             {editing && (
-              <button className="btn-text danger" onClick={() => void handleDelete()}>
-                删除
+              <button className="btn-text danger" disabled={submitting} onClick={() => void handleDelete()}>
+                {submitting ? '正在处理…' : '删除'}
               </button>
             )}
           </div>
           <div className="right">
-            <button className="btn-text" onClick={onClose}>
+            <button className="btn-text" disabled={submitting} onClick={onClose}>
               取消
             </button>
-            <button className="btn-text" onClick={() => void handleSave()}>
-              保存
+            <button className="btn-text" disabled={submitting} onClick={() => void handleSave()}>
+              {submitting ? '正在保存…' : '保存'}
             </button>
           </div>
         </div>

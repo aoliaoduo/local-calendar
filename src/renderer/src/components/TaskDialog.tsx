@@ -20,9 +20,16 @@ export default function TaskDialog({ task, occurrenceIndex, occurrenceDue, onClo
   const [editScope, setEditScope] = useState<'occurrence' | 'series'>(occurrenceIndex === undefined ? 'series' : 'occurrence')
   const [completed, setCompleted] = useState(task.status === 'completed')
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const save = async () => {
-    if (!title.trim()) return
+    if (submitting) return
+    if (!title.trim()) {
+      setError('请填写任务标题')
+      return
+    }
+    setSubmitting(true)
+    setError('')
     try {
       const patch = { title: title.trim(), dueAt: due || null, notes: notes.trim() || null, reminderMinutes: reminder === '' ? null : Number(reminder), priority: Number(priority), rrule: rrule || null, completed }
       if (occurrenceIndex !== undefined && editScope === 'occurrence') await api.updateTaskOccurrence(task.id, occurrenceIndex, patch)
@@ -31,10 +38,15 @@ export default function TaskDialog({ task, occurrenceIndex, occurrenceDue, onClo
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : '更新任务失败')
+    } finally {
+      setSubmitting(false)
     }
   }
 
   const remove = async () => {
+    if (submitting) return
+    setSubmitting(true)
+    setError('')
     try {
       if (occurrenceIndex !== undefined && editScope === 'occurrence') await api.deleteTaskOccurrence(task.id, occurrenceIndex)
       else await api.deleteTask(task.id)
@@ -42,13 +54,15 @@ export default function TaskDialog({ task, occurrenceIndex, occurrenceDue, onClo
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : '删除任务失败')
+    } finally {
+      setSubmitting(false)
     }
   }
 
   return (
-    <div className="dlg-mask" onMouseDown={onClose}>
+    <div className="dlg-mask" onMouseDown={() => { if (!submitting) onClose() }}>
       <div className="task-dialog" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="settings-head"><div><div className="settings-title">编辑任务</div><div className="settings-subtitle">任务与日历共享同一份本地数据</div></div><button className="icon-btn" title="关闭" onClick={onClose}><span className="material-icons">close</span></button></div>
+        <div className="settings-head"><div><div className="settings-title">编辑任务</div><div className="settings-subtitle">任务与日历共享同一份本地数据</div></div><button className="icon-btn" disabled={submitting} title="关闭" onClick={onClose}><span className="material-icons">close</span></button></div>
         <input className="task-dialog-title" autoFocus value={title} placeholder="任务标题" onChange={(event) => setTitle(event.target.value)} />
         <label className="task-dialog-field"><span className="material-icons">event</span><span>截止日期</span><input type="date" value={due} onChange={(event) => setDue(event.target.value)} /></label>
         {occurrenceIndex !== undefined && <label className="task-dialog-field"><span className="material-icons">event_repeat</span><span>应用范围</span><select value={editScope} onChange={(event) => { const next = event.target.value as 'occurrence' | 'series'; setEditScope(next); const value = next === 'series' ? task.dueAt : occurrenceDue; setDue(value ? DateTime.fromISO(value).toLocal().toFormat('yyyy-MM-dd') : '') }}><option value="occurrence">仅此任务</option><option value="series">整个系列</option></select></label>}
@@ -58,7 +72,7 @@ export default function TaskDialog({ task, occurrenceIndex, occurrenceDue, onClo
         <label className="task-dialog-check"><input type="checkbox" checked={completed} onChange={(event) => setCompleted(event.target.checked)} />已完成</label>
         <textarea className="task-dialog-notes" placeholder="添加备注" value={notes} onChange={(event) => setNotes(event.target.value)} />
         {error && <div className="settings-error">{error}</div>}
-        <div className="settings-foot"><button className="btn-text danger" onClick={() => void remove()}>删除</button><div><button className="btn-text" onClick={onClose}>取消</button><button className="btn-text" onClick={() => void save()}>保存</button></div></div>
+        <div className="settings-foot"><button className="btn-text danger" disabled={submitting} onClick={() => void remove()}>{submitting ? '正在处理…' : '删除'}</button><div><button className="btn-text" disabled={submitting} onClick={onClose}>取消</button><button className="btn-text" disabled={submitting} onClick={() => void save()}>{submitting ? '正在保存…' : '保存'}</button></div></div>
       </div>
     </div>
   )
