@@ -8,6 +8,7 @@ import { Backend, isAppRunning } from './backend'
 import { parseArgs, str } from './args'
 import { CliError } from './errors'
 import { HELP } from './help'
+import { calendarNames, emitJson, fmtEventLine, fmtTaskLine, resolveEvent, resolveTask, assertWritableCalendar, shortId, WEEKDAY_CN } from './command-utils'
 
 const cliDataDir = readCliDataDir(process.argv.slice(2))
 if (cliDataDir) process.env.LOCAL_CALENDAR_DATA_DIR = resolve(cliDataDir)
@@ -118,78 +119,12 @@ async function cmdImport(backend: Backend, flags: Record<string, string | true>,
   console.log(`已导入 ${imported.length} 条日程`)
 }
 
-function shortId(id: string): string {
-  return id.slice(0, 8)
-}
-
-const WEEKDAY_CN = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-
-function fmtEventLine(e: CalendarEvent, calName?: string): string {
-  const s = DateTime.fromISO(e.startUtc).toLocal()
-  const en = DateTime.fromISO(e.endUtc).toLocal()
-  const when = e.isAllDay
-    ? `${s.toFormat('yyyy-MM-dd')} 全天`
-    : s.hasSame(en, 'day')
-      ? `${s.toFormat('yyyy-MM-dd')} ${s.toFormat('HH:mm')}–${en.toFormat('HH:mm')}`
-      : `${s.toFormat('yyyy-MM-dd HH:mm')} – ${en.toFormat('yyyy-MM-dd HH:mm')}`
-  const segs = [when, `${e.rrule ? '↻ ' : ''}${e.title}`]
-  if (e.location) segs.push(`@ ${e.location}`)
-  if (calName) segs.push(`[${calName}]`)
-  segs.push(`id:${shortId(e.id)}`)
-  return segs.join('  ')
-}
-
-function fmtTaskLine(t: Task): string {
-  const mark = t.status === 'completed' ? '[x]' : '[ ]'
-  const due = t.dueAt ? ` 截止 ${DateTime.fromISO(t.dueAt).toLocal().toFormat('yyyy-MM-dd')}` : ''
-  return `${mark} ${t.rrule ? '↻ ' : ''}${t.title}${due}  id:${shortId(t.id)}`
-}
-
-async function calNames(backend: Backend): Promise<Map<string, string>> {
-  const cals = await backend.call<Calendar[]>('calendars.list')
-  return new Map(cals.map((c) => [c.id, c.name]))
-}
-
-// ---------- ID 前缀解析 ----------
-
-async function resolveEvent(backend: Backend, prefix: string | undefined): Promise<CalendarEvent> {
-  if (!prefix) throw new CliError('缺少日程 ID（先用 list 查看日程）')
-  if (prefix.startsWith('holiday-')) throw new CliError('中国节假日为内置只读日历，无法修改')
-  const base = prefix.split('#')[0]
-  const all = await backend.call<CalendarEvent[]>('events.list', {})
-  const matches = all.filter((e) => e.id === base || e.id.startsWith(base))
-  if (matches.length === 0) throw new CliError(`未找到 ID 以 "${prefix}" 开头的日程`)
-  if (matches.length > 1) throw new CliError(`ID 前缀 "${prefix}" 匹配到 ${matches.length} 个日程，请提供更长前缀`)
-  return matches[0]
-}
-
-async function resolveTask(backend: Backend, prefix: string | undefined): Promise<Task> {
-  if (!prefix) throw new CliError('缺少待办 ID（先用 task list 查看）')
-  const all = await backend.call<Task[]>('tasks.list', { filter: { status: 'all' } })
-  const matches = all.filter((t) => t.id === prefix || t.id.startsWith(prefix))
-  if (matches.length === 0) throw new CliError(`未找到 ID 以 "${prefix}" 开头的待办`)
-  if (matches.length > 1) throw new CliError(`ID 前缀 "${prefix}" 匹配到 ${matches.length} 个待办，请提供更长前缀`)
-  return matches[0]
-}
-
-async function assertWritableCalendar(backend: Backend, id: string): Promise<void> {
-  if (id === 'holidays') throw new CliError('中国节假日为只读日历，不能写入')
-  const cals = await backend.call<Calendar[]>('calendars.list')
-  if (!cals.some((c) => c.id === id)) {
-    throw new CliError(`日历 "${id}" 不存在。可用: ${cals.map((c) => `${c.id}(${c.name})`).join(' ')}`)
-  }
-}
-
 // ---------- 命令实现 ----------
-
-function emitJson(data: unknown): void {
-  console.log(JSON.stringify(data, null, 2))
-}
 
 async function cmdAgenda(backend: Backend, json: boolean): Promise<void> {
   const data = await backend.call<{ date: string; events: CalendarEvent[]; tasks: Task[] }>('agenda.today')
   if (json) return emitJson(data)
-  const names = await calNames(backend)
+  const names = await calendarNames(backend)
   const d = DateTime.fromISO(data.date)
   const lines = [`今天 ${data.date}（${WEEKDAY_CN[d.weekday - 1]}）`, '', `日程 (${data.events.length}):`]
   if (!data.events.length) lines.push('  （无）')
@@ -224,7 +159,7 @@ async function cmdNext(backend: Backend, json: boolean): Promise<void> {
     console.log('未来 30 天没有即将开始的日程')
     return
   }
-  const names = await calNames(backend)
+  const names = await calendarNames(backend)
   console.log(fmtEventLine(next, names.get(next.calendarId)))
 }
 
@@ -237,7 +172,7 @@ async function cmdList(backend: Backend, flags: Record<string, string | true>, j
     calendarId: str(flags, 'calendar')
   })
   if (json) return emitJson(events)
-  const names = await calNames(backend)
+  const names = await calendarNames(backend)
   console.log(`日程 ${from} ~ ${to} (${events.length}):`)
   if (!events.length) console.log('  （无）')
   for (const e of events) console.log(`  ${fmtEventLine(e, names.get(e.calendarId))}`)
@@ -268,7 +203,7 @@ async function cmdCreate(
     reminders: parseReminders(str(flags, 'remind'))
   })
   if (json) return emitJson(evt)
-  const names = await calNames(backend)
+  const names = await calendarNames(backend)
   console.log(`已创建 → ${fmtEventLine(evt, names.get(evt.calendarId))}`)
 }
 
@@ -295,7 +230,7 @@ async function cmdUpdate(
   if (!Object.keys(patch).length) throw new CliError('没有要修改的字段（--title / -s / -e / -c / -l / -n / -r / --remind / --all-day）')
   const evt = await backend.call<CalendarEvent>('events.update', { id: target.id, patch })
   if (json) return emitJson(evt)
-  const names = await calNames(backend)
+  const names = await calendarNames(backend)
   console.log(`已更新 → ${fmtEventLine(evt, names.get(evt.calendarId))}`)
 }
 
@@ -311,7 +246,7 @@ async function cmdSearch(backend: Backend, queryParts: string[], json: boolean):
   if (!query) throw new CliError('缺少关键词。用法: search <关键词>')
   const events = await backend.call<CalendarEvent[]>('events.search', { query })
   if (json) return emitJson(events)
-  const names = await calNames(backend)
+  const names = await calendarNames(backend)
   console.log(`"${query}" 的搜索结果 (${events.length}):`)
   if (!events.length) console.log('  （无）')
   for (const e of events) console.log(`  ${fmtEventLine(e, names.get(e.calendarId))}`)
@@ -445,7 +380,7 @@ async function cmdCalendar(backend: Backend, flags: Record<string, string | true
     return
   }
   if (action === 'update') {
-    const target = (await calNames(backend)).has(id ?? '') ? id! : undefined
+    const target = (await calendarNames(backend)).has(id ?? '') ? id! : undefined
     if (!target) throw new CliError('缺少或不存在的日历 ID（先用 calendars 查看）')
     const patch: Record<string, unknown> = {}
     if (str(flags, 'title')) patch.name = str(flags, 'title')
