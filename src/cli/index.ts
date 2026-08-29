@@ -49,7 +49,7 @@ const HELP = `本地日历 CLI — 操作 Local Calendar 的日程与待办
 待办:
   task list [--all | --done] [--today | --overdue | --scheduled]
                                       列出待办（默认未完成）
-  task add <标题> [-d 截止日期] [-n 备注] [-p 优先级] [-r 重复] [--remind 分钟]
+  task add <标题> [-d 截止日期] [-n 备注] [-p 优先级] [-r 重复] [--remind 分钟] [--parent 父任务ID]
   task update <id> [--title 标题] [-d 截止日期] [-n 备注] [-p 优先级] [-r 重复] [--remind 分钟|none]
   task done <id...>                   标记一个或多个任务完成
   task done-all --today|--overdue     按日期批量完成任务
@@ -138,7 +138,7 @@ const SHORT_TO_LONG: Record<string, string> = {
   o: 'out',
   i: 'in'
 }
-const VALUE_FLAGS = new Set(['start', 'end', 'calendar', 'location', 'note', 'due', 'from', 'to', 'title', 'repeat', 'remind', 'priority', 'out', 'in', 'data-dir'])
+const VALUE_FLAGS = new Set(['start', 'end', 'calendar', 'location', 'note', 'due', 'from', 'to', 'title', 'repeat', 'remind', 'priority', 'out', 'in', 'data-dir', 'parent'])
 const BOOL_FLAGS = new Set(['all-day', 'all', 'done', 'today', 'overdue', 'scheduled', 'json', 'help'])
 
 const REPEAT_MAP: Record<string, string> = {
@@ -504,6 +504,7 @@ async function cmdTaskAdd(
   const title = titleParts.join(' ').trim()
   if (!title) throw new CliError('缺少标题。用法: task add <标题> [-d 截止日期]')
   const task = await backend.call<Task>('tasks.create', {
+    parentId: str(flags, 'parent') ? (await resolveTask(backend, str(flags, 'parent'))).id : undefined,
     title,
     notes: str(flags, 'note'),
     dueAt: str(flags, 'due'),
