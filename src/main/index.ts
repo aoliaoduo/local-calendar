@@ -32,6 +32,14 @@ function saveWindowState(win: BrowserWindow): void {
     writeFileSync(windowStatePath(), JSON.stringify({ ...previous, ...(bounds ?? {}), maximized: win.isMaximized() }, null, 2))
   } catch { /* 状态保存失败不影响应用 */ }
 }
+let windowStateTimer: NodeJS.Timeout | null = null
+function scheduleWindowStateSave(win: BrowserWindow): void {
+  if (windowStateTimer) clearTimeout(windowStateTimer)
+  windowStateTimer = setTimeout(() => {
+    windowStateTimer = null
+    saveWindowState(win)
+  }, 150)
+}
 
 function configurePortableStorage(): void {
   const executableDir = app.isPackaged
@@ -197,10 +205,10 @@ function createWindow(): void {
       win.webContents.send('titlebar-pointerdown')
     }
   })
-  win.on('resize', () => saveWindowState(win))
-  win.on('move', () => saveWindowState(win))
-  win.on('maximize', () => saveWindowState(win))
-  win.on('unmaximize', () => saveWindowState(win))
+  win.on('resize', () => scheduleWindowStateSave(win))
+  win.on('move', () => scheduleWindowStateSave(win))
+  win.on('maximize', () => scheduleWindowStateSave(win))
+  win.on('unmaximize', () => scheduleWindowStateSave(win))
   win.on('ready-to-show', () => {
     if (saved.maximized !== false) win.maximize()
     win.show()
@@ -369,6 +377,11 @@ function fireTaskReminder(taskTitle: string, dueAt: DateTime, leadMin: number, t
 
 function checkReminders(): void {
   const now = DateTime.now()
+  if (firedReminders.size > 2000) {
+    const recent = [...firedReminders].slice(-1000)
+    firedReminders.clear()
+    recent.forEach((key) => firedReminders.add(key))
+  }
   const from = now.minus({ days: 1 }).toFormat('yyyy-MM-dd')
   const to = now.plus({ days: 8 }).toFormat('yyyy-MM-dd')
   let events
