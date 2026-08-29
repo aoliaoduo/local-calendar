@@ -504,6 +504,9 @@ app.whenReady().then(() => {
       filters: [{ name: 'SQLite 数据库', extensions: ['db'] }]
     })
     if (result.canceled || !result.filePaths[0]) return null
+    const backupDir = join(getDataDir(), 'backups')
+    mkdirSync(backupDir, { recursive: true })
+    await svc.backupTo(join(backupDir, `before-restore-${new Date().toISOString().replace(/[:.]/g, '-')}.db`))
     svc.restoreFrom(result.filePaths[0], getDbPath())
     isQuitting = true
     app.relaunch()
