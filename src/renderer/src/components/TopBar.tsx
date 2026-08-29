@@ -16,8 +16,6 @@ interface TopBarProps {
   onPrev: () => void
   onNext: () => void
   onToday: () => void
-  tasksOpen: boolean
-  onToggleTasks: () => void
   onSearchPick: (result: SearchResult) => void
   onToast: (message: string) => void
   onSettings: () => void
@@ -47,8 +45,6 @@ export default function TopBar({
   onPrev,
   onNext,
   onToday,
-  tasksOpen,
-  onToggleTasks,
   onSearchPick,
   onToast,
   onSettings,
@@ -267,10 +263,6 @@ export default function TopBar({
             </>
           )}
         </div>
-
-        <button className={`icon-btn task-toggle${tasksOpen ? ' active' : ''}`} title={tasksOpen ? '隐藏任务' : '显示任务'} onClick={onToggleTasks}>
-          <span className="material-icons">check_circle</span>
-        </button>
 
         <button className="icon-btn" title="应用信息" onClick={() => onToast('本地日历 · 数据仅保存在此电脑。')}>
           <span className="material-icons">apps</span>

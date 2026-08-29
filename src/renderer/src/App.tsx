@@ -391,8 +391,6 @@ export default function App() {
         onPrev={() => step(-1)}
         onNext={() => step(1)}
         onToday={() => setCursor(DateTime.now())}
-        tasksOpen={tasksOpen}
-        onToggleTasks={() => setTasksOpen((v) => !v)}
         onToast={setToast}
         onSettings={() => setSettingsOpen(true)}
         onHelp={() => setHelpOpen(true)}
@@ -480,6 +478,11 @@ export default function App() {
       </main>
 
       {tasksOpen && <TasksPanel onClose={() => setTasksOpen(false)} onToast={setToast} />}
+      <aside className="app-rail" aria-label="应用侧栏">
+        <button className={`app-rail-btn${tasksOpen ? ' active' : ''}`} title={tasksOpen ? '隐藏任务面板' : '显示任务面板'} onClick={() => setTasksOpen((value) => !value)}><span className="material-icons">check_circle</span></button>
+        <span className="app-rail-divider" />
+        <button className="app-rail-btn app-rail-add" title="创建日程" onClick={() => setDialog({ mode: 'create', day: DateTime.now(), hour: Math.min(23, DateTime.now().hour + 1) })}><span className="material-icons">add</span></button>
+      </aside>
 
       {dialog && (
         <EventDialog

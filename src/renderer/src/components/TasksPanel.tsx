@@ -19,6 +19,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const [newRrule, setNewRrule] = useState('')
   const [showDone, setShowDone] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [taskListOpen, setTaskListOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -35,6 +36,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const taskAddRef = useRef<HTMLDivElement>(null)
   const sortRef = useRef<HTMLDivElement>(null)
   const moreMenuRef = useRef<HTMLDivElement>(null)
+  const taskListRef = useRef<HTMLDivElement>(null)
   const [editRrule, setEditRrule] = useState('')
 
   const load = async () => {
@@ -55,6 +57,13 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
     document.addEventListener('pointerdown', close)
     return () => document.removeEventListener('pointerdown', close)
   }, [moreOpen])
+
+  useEffect(() => {
+    if (!taskListOpen) return
+    const close = (event: PointerEvent) => { if (!taskListRef.current?.contains(event.target as Node)) setTaskListOpen(false) }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [taskListOpen])
 
   useEffect(() => {
     if (!sortOpen) return
@@ -308,9 +317,10 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   return (
     <aside className="tasks-panel">
       <div className="tasks-head">
-        <div className="tasks-heading">
+        <div className="tasks-heading" ref={taskListRef}>
           <span className="tasks-eyebrow">TASKS</span>
-          <button className="tasks-list-selector" title="任务列表"><span>我的任务</span><span className="material-icons">arrow_drop_down</span></button>
+          <button className={`tasks-list-selector${taskListOpen ? ' active' : ''}`} title="任务列表" aria-expanded={taskListOpen} onClick={() => setTaskListOpen((value) => !value)}><span>我的任务</span><span className="material-icons">arrow_drop_down</span></button>
+          {taskListOpen && <div className="tasks-list-menu"><button className="active"><span className="material-icons">check</span><span>我的任务</span></button><button onClick={() => { setShowDone(true); setTaskListOpen(false) }}><span className="material-icons">done_all</span><span>已完成任务</span></button></div>}
         </div>
         <div className="tasks-head-actions">
           <button className="icon-btn" title="搜索任务" onClick={() => setSearchOpen(true)}><span className="material-icons">search</span></button>
