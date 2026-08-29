@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { DateTime } from 'luxon'
 import { api, type TaskInfo } from '../api'
+import AttachmentSection from './AttachmentSection'
 
 interface TaskDialogProps {
   task: TaskInfo
@@ -21,6 +22,47 @@ export default function TaskDialog({ task, occurrenceIndex, occurrenceDue, onClo
   const [completed, setCompleted] = useState(task.status === 'completed')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [children, setChildren] = useState<TaskInfo[]>([])
+  const [childTitle, setChildTitle] = useState('')
+  const [childBusy, setChildBusy] = useState(false)
+
+  const loadChildren = async () => {
+    try {
+      setChildren((await api.listTasks('all')).filter((item) => item.parentId === task.id))
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '加载子任务失败')
+    }
+  }
+
+  useEffect(() => { void loadChildren() }, [task.id])
+
+  const addChild = async () => {
+    const title = childTitle.trim()
+    if (!title || childBusy) return
+    setChildBusy(true)
+    try {
+      await api.createTask({ parentId: task.id, title })
+      setChildTitle('')
+      await loadChildren()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '添加子任务失败')
+    } finally {
+      setChildBusy(false)
+    }
+  }
+
+  const toggleChild = async (child: TaskInfo) => {
+    if (childBusy) return
+    setChildBusy(true)
+    try {
+      await api.updateTask(child.id, { completed: child.status !== 'completed' })
+      await loadChildren()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '更新子任务失败')
+    } finally {
+      setChildBusy(false)
+    }
+  }
 
   const save = async () => {
     if (submitting) return
@@ -71,6 +113,8 @@ export default function TaskDialog({ task, occurrenceIndex, occurrenceDue, onClo
         <label className="task-dialog-field"><span className="material-icons">repeat</span><span>重复</span><select value={rrule} onChange={(event) => setRrule(event.target.value)}><option value="">不重复</option><option value="FREQ=DAILY">每天</option><option value="FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR">每个工作日</option><option value="FREQ=WEEKLY">每周</option><option value="FREQ=MONTHLY">每月</option><option value="FREQ=YEARLY">每年</option></select></label>
         <label className="task-dialog-check"><input type="checkbox" checked={completed} onChange={(event) => setCompleted(event.target.checked)} />已完成</label>
         <textarea className="task-dialog-notes" placeholder="添加备注" value={notes} onChange={(event) => setNotes(event.target.value)} />
+        <div className="subtask-section"><div className="subtask-head"><span className="material-icons">subdirectory_arrow_right</span><span>子任务</span></div>{children.map((child) => <label className={`subtask-item${child.status === 'completed' ? ' done' : ''}`} key={child.id}><input type="checkbox" checked={child.status === 'completed'} disabled={childBusy} onChange={() => void toggleChild(child)} /><span>{child.title}</span></label>)}<div className="subtask-add"><input value={childTitle} disabled={childBusy} placeholder="添加子任务" onChange={(event) => setChildTitle(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void addChild() }} /><button type="button" className="btn-text compact" disabled={!childTitle.trim() || childBusy} onClick={() => void addChild()}>添加</button></div></div>
+        <AttachmentSection ownerKind="task" ownerId={task.id} />
         {error && <div className="settings-error">{error}</div>}
         <div className="settings-foot"><button className="btn-text danger" disabled={submitting} onClick={() => void remove()}>{submitting ? '正在处理…' : '删除'}</button><div><button className="btn-text" disabled={submitting} onClick={onClose}>取消</button><button className="btn-text" disabled={submitting} onClick={() => void save()}>{submitting ? '正在保存…' : '保存'}</button></div></div>
       </div>

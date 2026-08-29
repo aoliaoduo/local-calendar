@@ -30,6 +30,8 @@ interface CalendarApi {
   setNotificationSettings: (enabled: boolean) => Promise<{ notificationsEnabled: boolean }>
   getProfile: () => Promise<{ username: string; avatarColor: string; avatarImage: string | null }>
   setProfile: (profile: { username?: string; avatarColor?: string; avatarImage?: string | null }) => Promise<{ username: string; avatarColor: string; avatarImage: string | null }>
+  chooseAttachment: () => Promise<{ name: string; mimeType: string; contentBase64: string } | null>
+  openAttachment: (id: string) => Promise<string>
 }
 
 declare global {
@@ -77,6 +79,7 @@ export type SearchResult =
 
 export interface TaskInfo {
   id: string
+  parentId: string | null
   title: string
   notes: string | null
   dueAt: string | null
@@ -88,6 +91,22 @@ export interface TaskInfo {
   createdAt: string
   updatedAt: string
   status: 'needsAction' | 'completed'
+}
+
+export interface AttachmentInfo {
+  id: string
+  ownerKind: 'event' | 'task'
+  ownerId: string
+  name: string
+  mimeType: string
+  size: number
+  createdAt: string
+}
+
+export interface AttachmentUpload {
+  name: string
+  mimeType: string
+  contentBase64: string
 }
 
 export interface TrashInfo {
@@ -117,7 +136,7 @@ export const api = {
   listTasks: (status: 'needsAction' | 'completed' | 'all' = 'needsAction') =>
     rpc<TaskInfo[]>('tasks.list', { filter: { status } }),
   listTaskOccurrences: (from?: string, to?: string) => rpc<TaskInfo[]>('tasks.occurrences', { from, to }),
-  createTask: (input: { title: string; notes?: string; dueAt?: string; reminderMinutes?: number | null; rrule?: string | null; priority?: number }) => rpc<TaskInfo>('tasks.create', input),
+  createTask: (input: { parentId?: string | null; title: string; notes?: string; dueAt?: string; reminderMinutes?: number | null; rrule?: string | null; priority?: number }) => rpc<TaskInfo>('tasks.create', input),
   updateTask: (id: string, patch: Record<string, unknown>) => rpc<TaskInfo | null>('tasks.update', { id, patch }),
   updateTaskOccurrence: (id: string, occurrenceIndex: number, patch: Record<string, unknown>) =>
     rpc<TaskInfo>('tasks.updateOccurrence', { id, occurrenceIndex, patch }),
@@ -125,6 +144,9 @@ export const api = {
     rpc<boolean>('tasks.deleteOccurrence', { id, occurrenceIndex }),
   deleteTask: (id: string) => rpc<boolean>('tasks.delete', { id }),
   reorderTasks: (ids: string[]) => rpc<boolean>('tasks.reorder', { ids }),
+  listAttachments: (ownerKind: 'event' | 'task', ownerId: string) => rpc<AttachmentInfo[]>('attachments.list', { ownerKind, ownerId }),
+  createAttachment: (ownerKind: 'event' | 'task', ownerId: string, upload: AttachmentUpload) => rpc<AttachmentInfo>('attachments.create', { ownerKind, ownerId, ...upload }),
+  deleteAttachment: (id: string) => rpc<boolean>('attachments.delete', { id }),
   listTrash: () => rpc<TrashInfo[]>('trash.list'),
   restoreTrash: (id: string) => rpc<boolean>('trash.restore', { id }),
   deleteTrash: (id: string) => rpc<boolean>('trash.delete', { id })

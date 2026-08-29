@@ -36,5 +36,7 @@ contextBridge.exposeInMainWorld('calendarApi', {
   backupData: () => ipcRenderer.invoke('backup-data') as Promise<string | null>,
   restoreData: () => ipcRenderer.invoke('restore-data') as Promise<string | null>,
   importIcs: () => ipcRenderer.invoke('import-ics') as Promise<number>,
-  chooseAvatar: () => ipcRenderer.invoke('choose-avatar') as Promise<string | null>
+  chooseAvatar: () => ipcRenderer.invoke('choose-avatar') as Promise<string | null>,
+  chooseAttachment: () => ipcRenderer.invoke('choose-attachment') as Promise<{ name: string; mimeType: string; contentBase64: string } | null>,
+  openAttachment: (id: string) => ipcRenderer.invoke('open-attachment', id) as Promise<string>
 })

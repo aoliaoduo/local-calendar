@@ -119,8 +119,8 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
     }
   }
 
-  const open = tasks.filter((t) => t.status === 'needsAction')
-  const done = tasks.filter((t) => t.status === 'completed')
+  const open = tasks.filter((t) => t.status === 'needsAction' && !t.parentId)
+  const done = tasks.filter((t) => t.status === 'completed' && !t.parentId)
   const matches = (task: TaskInfo) => !query.trim() || `${task.title} ${task.notes ?? ''}`.toLowerCase().includes(query.trim().toLowerCase())
   const visibleOpen = open.filter(matches)
   const visibleDone = done.filter(matches)

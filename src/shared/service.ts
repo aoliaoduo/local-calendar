@@ -6,6 +6,8 @@ import { getHolidays, HOLIDAY_CALENDAR_ID } from './lunar'
 import type {
   Calendar,
   CalendarEvent,
+  Attachment,
+  CreateAttachmentInput,
   CreateCalendarInput,
   CreateEventInput,
   CreateTaskInput,
@@ -237,6 +239,7 @@ function rowToEvent(r: Record<string, unknown>): CalendarEvent {
 function rowToTask(r: Record<string, unknown>): Task {
   return {
     id: r.id as string,
+    parentId: (r.parent_id as string | null) ?? null,
     title: r.title as string,
     notes: (r.notes as string | null) ?? null,
     dueAt: (r.due_at as string | null) ?? null,
@@ -249,6 +252,18 @@ function rowToTask(r: Record<string, unknown>): Task {
     status: r.status as Task['status'],
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string
+  }
+}
+
+function rowToAttachment(r: Record<string, unknown>): Attachment {
+  return {
+    id: r.id as string,
+    ownerKind: r.owner_kind as Attachment['ownerKind'],
+    ownerId: r.owner_id as string,
+    name: r.name as string,
+    mimeType: r.mime_type as string,
+    size: r.size as number,
+    createdAt: r.created_at as string
   }
 }
 
@@ -593,9 +608,15 @@ export class CalendarService {
         ? /^\d{4}-\d{2}-\d{2}$/.test(input.dueAt.trim()) ? 900 : 0
         : null
     const priority = normalizeTaskPriority(input.priority)
+    const parentId = input.parentId?.trim() || null
+    if (parentId) {
+      const parent = this.getTask(parentId)
+      if (!parent) throw new Error('父任务不存在')
+      if (parent.parentId) throw new Error('子任务暂不支持继续嵌套')
+    }
     this.db
-      .prepare('INSERT INTO tasks (id, title, notes, due_at, reminder_minutes, priority, sort_order, rrule, exdates, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(id, input.title.trim() || '（无标题）', input.notes ?? null, due ? due.toUTC().toISO() : null, reminderMinutes, priority, Date.now(), rrule, '[]', 'needsAction', now, now)
+      .prepare('INSERT INTO tasks (id, parent_id, title, notes, due_at, reminder_minutes, priority, sort_order, rrule, exdates, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(id, parentId, input.title.trim() || '（无标题）', input.notes ?? null, due ? due.toUTC().toISO() : null, reminderMinutes, priority, Date.now(), rrule, '[]', 'needsAction', now, now)
     return this.getTask(id)!
   }
 
@@ -663,8 +684,14 @@ export class CalendarService {
   deleteTask(id: string): boolean {
     const row = this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
     if (!row) return false
-    this.db.prepare('INSERT INTO trash (id, kind, title, payload, deleted_at) VALUES (?, ?, ?, ?, ?)').run(randomUUID(), 'task', row.title as string, JSON.stringify(row), nowIso())
-    return this.db.prepare('DELETE FROM tasks WHERE id = ?').run(id).changes > 0
+    const rows = [row, ...(this.db.prepare('SELECT * FROM tasks WHERE parent_id = ?').all(id) as Record<string, unknown>[])]
+    const saveTrash = this.db.prepare('INSERT INTO trash (id, kind, title, payload, deleted_at) VALUES (?, ?, ?, ?, ?)')
+    const remove = this.db.prepare('DELETE FROM tasks WHERE id = ?')
+    this.db.transaction(() => {
+      for (const task of rows) saveTrash.run(randomUUID(), 'task', task.title as string, JSON.stringify(task), nowIso())
+      for (const task of [...rows].reverse()) remove.run(task.id)
+    })()
+    return true
   }
 
   reorderTasks(ids: string[]): boolean {
@@ -745,6 +772,7 @@ export class CalendarService {
     const occurrence = this.recurringTaskOccurrence(task, occurrenceIndex)
     if (!occurrence) throw new Error('重复任务实例不存在')
     const standalone = this.createTask({
+      parentId: task.parentId,
       title: patch.title ?? task.title,
       notes: patch.notes !== undefined ? patch.notes ?? undefined : task.notes ?? undefined,
       dueAt: patch.dueAt !== undefined ? patch.dueAt ?? undefined : occurrence.toISODate() ?? undefined,
@@ -782,17 +810,53 @@ export class CalendarService {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(payload.id, calendarId, payload.title, payload.description ?? null, payload.location ?? null, payload.start_utc, payload.end_utc, payload.is_all_day ?? 0, payload.color_override ?? null, payload.rrule ?? null, payload.exdates ?? '[]', payload.status ?? 'confirmed', payload.reminders ?? '[]', payload.created_at, payload.updated_at)
     } else {
+      const parentId = payload.parent_id && this.getTask(payload.parent_id as string) ? payload.parent_id : null
       this.db.prepare(
-        `INSERT OR REPLACE INTO tasks (id, title, notes, due_at, reminder_minutes, priority, sort_order, rrule, exdates, completed_at, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(payload.id, payload.title, payload.notes ?? null, payload.due_at ?? null, payload.reminder_minutes ?? null, payload.priority ?? 0, payload.sort_order ?? Date.now(), payload.rrule ?? null, payload.exdates ?? '[]', payload.completed_at ?? null, payload.status ?? 'needsAction', payload.created_at, payload.updated_at)
+        `INSERT OR REPLACE INTO tasks (id, parent_id, title, notes, due_at, reminder_minutes, priority, sort_order, rrule, exdates, completed_at, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(payload.id, parentId, payload.title, payload.notes ?? null, payload.due_at ?? null, payload.reminder_minutes ?? null, payload.priority ?? 0, payload.sort_order ?? Date.now(), payload.rrule ?? null, payload.exdates ?? '[]', payload.completed_at ?? null, payload.status ?? 'needsAction', payload.created_at, payload.updated_at)
     }
     this.db.prepare('DELETE FROM trash WHERE id = ?').run(id)
     return true
   }
 
   deleteTrash(id: string): boolean {
+    const row = this.db.prepare('SELECT * FROM trash WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    if (!row) return false
+    const payload = JSON.parse(row.payload as string) as Record<string, unknown>
+    const ownerKind = row.kind as 'event' | 'task'
+    this.db.prepare('DELETE FROM attachments WHERE owner_kind = ? AND owner_id = ?').run(ownerKind, payload.id)
     return this.db.prepare('DELETE FROM trash WHERE id = ?').run(id).changes > 0
+  }
+
+  // ---------- attachments ----------
+
+  listAttachments(ownerKind: Attachment['ownerKind'], ownerId: string): Attachment[] {
+    return (this.db.prepare('SELECT id, owner_kind, owner_id, name, mime_type, size, created_at FROM attachments WHERE owner_kind = ? AND owner_id = ? ORDER BY created_at').all(ownerKind, ownerId) as Record<string, unknown>[]).map(rowToAttachment)
+  }
+
+  createAttachment(input: CreateAttachmentInput): Attachment {
+    const ownerId = input.ownerId.trim()
+    if (!ownerId) throw new Error('附件归属不能为空')
+    if (input.ownerKind === 'event' && !this.getEvent(ownerId)) throw new Error('日程不存在，无法添加附件')
+    if (input.ownerKind === 'task' && !this.getTask(ownerId)) throw new Error('任务不存在，无法添加附件')
+    const name = input.name.trim().slice(0, 160) || '附件'
+    const mimeType = input.mimeType.trim().slice(0, 120) || 'application/octet-stream'
+    const content = Buffer.from(input.contentBase64, 'base64')
+    if (!content.length || content.length > 8 * 1024 * 1024) throw new Error('附件大小需在 1 B 到 8 MB 之间')
+    const id = randomUUID()
+    const createdAt = nowIso()
+    this.db.prepare('INSERT INTO attachments (id, owner_kind, owner_id, name, mime_type, size, content, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(id, input.ownerKind, ownerId, name, mimeType, content.length, content, createdAt)
+    return this.listAttachments(input.ownerKind, ownerId).find((attachment) => attachment.id === id)!
+  }
+
+  deleteAttachment(id: string): boolean {
+    return this.db.prepare('DELETE FROM attachments WHERE id = ?').run(id).changes > 0
+  }
+
+  getAttachmentContent(id: string): { attachment: Attachment; content: Buffer } | null {
+    const row = this.db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return row ? { attachment: rowToAttachment(row), content: row.content as Buffer } : null
   }
 
   // ---------- agenda ----------

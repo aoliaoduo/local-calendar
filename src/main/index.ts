@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, screen, shell, Tray, Notification } from 'electron'
-import { dirname, join } from 'node:path'
+import { dirname, extname, join } from 'node:path'
 import { createServer, type Server } from 'node:http'
-import { randomBytes } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { DateTime } from 'luxon'
 import { openDatabase } from '../shared/db'
 import { CalendarService } from '../shared/service'
@@ -89,6 +89,21 @@ function getIconPath(): string {
     join(process.cwd(), 'src/renderer/icon.ico')
   ]
   return candidates.find((candidate) => existsSync(candidate)) || candidates[0]
+}
+
+function attachmentMimeType(path: string): string {
+  const ext = extname(path).toLowerCase()
+  if (ext === '.png') return 'image/png'
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg'
+  if (ext === '.webp') return 'image/webp'
+  if (ext === '.gif') return 'image/gif'
+  if (ext === '.pdf') return 'application/pdf'
+  if (ext === '.txt' || ext === '.md') return 'text/plain'
+  return 'application/octet-stream'
+}
+
+function safeAttachmentName(name: string): string {
+  return name.replace(/[\\/:*?"<>|]/g, '_').slice(-160) || 'attachment'
 }
 
 configurePortableStorage()
@@ -555,6 +570,32 @@ app.whenReady().then(() => {
     const ext = filePath.toLowerCase().split('.').pop()
     const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : 'image/png'
     return `data:${mime};base64,${readFileSync(filePath).toString('base64')}`
+  })
+  ipcMain.handle('choose-attachment', async () => {
+    const result = await dialog.showOpenDialog({
+      title: '选择附件',
+      properties: ['openFile']
+    })
+    const filePath = result.filePaths[0]
+    if (result.canceled || !filePath) return null
+    const stat = statSync(filePath)
+    if (stat.size > 8 * 1024 * 1024) throw new Error('附件不能超过 8 MB')
+    return {
+      name: safeAttachmentName(filePath.split(/[\\/]/).pop() || 'attachment'),
+      mimeType: attachmentMimeType(filePath),
+      contentBase64: readFileSync(filePath).toString('base64')
+    }
+  })
+  ipcMain.handle('open-attachment', async (_event, id: string) => {
+    const found = svc.getAttachmentContent(id)
+    if (!found) throw new Error('附件不存在')
+    const cacheDir = join(getDataDir(), 'attachment-cache')
+    mkdirSync(cacheDir, { recursive: true })
+    const path = join(cacheDir, `${randomUUID()}-${safeAttachmentName(found.attachment.name)}`)
+    writeFileSync(path, found.content)
+    const error = await shell.openPath(path)
+    if (error) throw new Error(error)
+    return path
   })
 
   startRpcServer(() => BrowserWindow.getAllWindows())

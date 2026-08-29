@@ -37,6 +37,7 @@ CREATE INDEX IF NOT EXISTS idx_events_time ON events(start_utc, end_utc);
 
 CREATE TABLE IF NOT EXISTS tasks (
   id TEXT PRIMARY KEY,
+  parent_id TEXT REFERENCES tasks(id),
   title TEXT NOT NULL,
   notes TEXT,
   due_at TEXT,
@@ -50,6 +51,19 @@ CREATE TABLE IF NOT EXISTS tasks (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS attachments (
+  id TEXT PRIMARY KEY,
+  owner_kind TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  content BLOB NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_attachments_owner ON attachments(owner_kind, owner_id);
 
 CREATE TABLE IF NOT EXISTS trash (
   id TEXT PRIMARY KEY,
@@ -94,6 +108,10 @@ function migrateSchema(db: DB): void {
   if (!taskColumns.some((column) => column.name === 'exdates')) {
     db.exec("ALTER TABLE tasks ADD COLUMN exdates TEXT NOT NULL DEFAULT '[]'")
   }
+  if (!taskColumns.some((column) => column.name === 'parent_id')) {
+    db.exec('ALTER TABLE tasks ADD COLUMN parent_id TEXT REFERENCES tasks(id)')
+  }
+  db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id)')
 }
 
 function seedDefaultData(db: DB): void {

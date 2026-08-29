@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { DateTime } from 'luxon'
 import { api, type CalendarInfo, type EventInfo, type ReminderInfo } from '../api'
+import AttachmentSection from './AttachmentSection'
 
 export const EVENT_PALETTE = [
   '#d50000',
@@ -334,6 +335,8 @@ export default function EventDialog({ state, calendars, onClose, onSaved, onCrea
             ))}
           </div>
         </div>
+
+        {editing && existing && <AttachmentSection ownerKind="event" ownerId={existing.id} />}
 
         {error && (
           <div style={{ color: 'var(--danger)', fontSize: 12, padding: '4px 0 4px 40px' }}>{error}</div>

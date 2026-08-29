@@ -44,6 +44,7 @@ export type TaskStatus = 'needsAction' | 'completed'
 
 export interface Task {
   id: string
+  parentId: string | null
   title: string
   notes: string | null
   dueAt: string | null
@@ -56,6 +57,24 @@ export interface Task {
   status: TaskStatus
   createdAt: string
   updatedAt: string
+}
+
+export interface Attachment {
+  id: string
+  ownerKind: 'event' | 'task'
+  ownerId: string
+  name: string
+  mimeType: string
+  size: number
+  createdAt: string
+}
+
+export interface CreateAttachmentInput {
+  ownerKind: 'event' | 'task'
+  ownerId: string
+  name: string
+  mimeType: string
+  contentBase64: string
 }
 
 export interface CreateEventInput {
@@ -86,6 +105,7 @@ export interface UpdateEventInput {
 }
 
 export interface CreateTaskInput {
+  parentId?: string | null
   title: string
   notes?: string
   dueAt?: string

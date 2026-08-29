@@ -1102,6 +1102,61 @@
   min-height: 56px;
 }
 
+.attachment-section,
+.subtask-section {
+  margin: 10px 0 6px 40px;
+  padding: 10px 12px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  color: var(--text-2);
+}
+
+.attachment-head,
+.subtask-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.attachment-head .material-icons,
+.subtask-head .material-icons { font-size: 19px; color: var(--text-3); }
+.attachment-head .btn-text { margin-left: auto; }
+.attachment-drop-hint { margin: 3px 0 7px 27px; color: var(--text-4); font-size: 12px; }
+
+.attachment-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding-left: 27px;
+}
+
+.attachment-item > .material-icons { font-size: 18px; color: var(--g-blue); }
+.attachment-open { min-width: 0; flex: 1; display: flex; flex-direction: column; align-items: flex-start; color: var(--g-blue-text); text-align: left; overflow: hidden; }
+.attachment-open:hover { color: var(--g-blue); }
+.attachment-open:not(:disabled) { opacity: 1; }
+.attachment-open small { max-width: 100%; color: var(--text-4); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.subtask-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 31px;
+  padding-left: 27px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.subtask-item input { accent-color: var(--g-blue); }
+.subtask-item.done span { color: var(--text-4); text-decoration: line-through; }
+.subtask-add { display: flex; align-items: center; gap: 8px; margin: 5px 0 0 27px; }
+.subtask-add input { min-width: 0; flex: 1; height: 30px; border: none; border-bottom: 1px solid var(--divider); color: var(--text-1); background: transparent; }
+.subtask-add input:focus { border-bottom: 2px solid var(--g-blue); }
+
 .time-inputs {
   display: flex;
   align-items: center;
@@ -1459,6 +1514,8 @@
 
 .task-dialog {
   width: min(500px, calc(100vw - 32px));
+  max-height: min(780px, calc(100vh - 40px));
+  overflow-y: auto;
   background: #fff;
   border-radius: 16px;
   padding: 20px 24px 12px;

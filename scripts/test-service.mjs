@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { DateTime } from 'luxon'
+import Database from 'better-sqlite3'
 import { isReminderDue } from '../src/shared/reminders.ts'
 import { parseIcsEvents } from '../src/shared/ics.ts'
 
@@ -49,6 +50,16 @@ const openDatabase = service.openDatabase ?? service.o
 const getDataDir = service.getDataDir ?? service.a
 assert.ok(CalendarService && openDatabase, 'service exports not found')
 assert.equal(resolve(getDataDir()), resolve(dataDir))
+const oldSchemaDir = join(dataDir, 'old-schema')
+mkdirSync(oldSchemaDir, { recursive: true })
+const oldSchemaDb = new Database(join(oldSchemaDir, 'calendar.db'))
+oldSchemaDb.exec('CREATE TABLE tasks (id TEXT PRIMARY KEY, title TEXT NOT NULL)')
+oldSchemaDb.close()
+process.env.LOCAL_CALENDAR_DATA_DIR = oldSchemaDir
+const migratedSchemaDb = openDatabase()
+assert.equal((migratedSchemaDb.prepare('PRAGMA table_info(tasks)').all()).some((column) => column.name === 'parent_id'), true)
+migratedSchemaDb.close()
+process.env.LOCAL_CALENDAR_DATA_DIR = dataDir
 const appDataRoot = join(dataDir, 'appdata')
 const legacyDir = join(appDataRoot, 'local-calendar')
 const migratedDir = join(dataDir, 'migrated-target')
@@ -101,6 +112,21 @@ const first = calendar.createTask({ title: 'first' })
 const second = calendar.createTask({ title: 'second' })
 calendar.reorderTasks([second.id, first.id])
 assert.equal(calendar.listTasks({ status: 'all' }).find((task) => task.id === second.id)?.sortOrder < calendar.listTasks({ status: 'all' }).find((task) => task.id === first.id)?.sortOrder, true)
+
+const parentTask = calendar.createTask({ title: 'parent task' })
+const childTask = calendar.createTask({ title: 'child task', parentId: parentTask.id })
+assert.equal(childTask.parentId, parentTask.id)
+assert.throws(() => calendar.createTask({ title: 'nested child', parentId: childTask.id }))
+const attachment = calendar.createAttachment({ ownerKind: 'task', ownerId: parentTask.id, name: 'note.txt', mimeType: 'text/plain', contentBase64: Buffer.from('attachment body').toString('base64') })
+assert.equal(calendar.listAttachments('task', parentTask.id)[0]?.id, attachment.id)
+assert.equal(calendar.getAttachmentContent(attachment.id)?.content.toString('utf8'), 'attachment body')
+calendar.deleteTask(parentTask.id)
+assert.equal(calendar.listTrash().filter((item) => item.kind === 'task' && ['parent task', 'child task'].includes(item.title)).length, 2)
+assert.equal(calendar.listAttachments('task', parentTask.id).length, 1)
+const parentTrash = calendar.listTrash().find((item) => item.kind === 'task' && item.title === 'parent task')
+assert.ok(parentTrash)
+calendar.deleteTrash(parentTrash.id)
+assert.equal(calendar.listAttachments('task', parentTask.id).length, 0)
 
 const invalidBackup = join(dataDir, 'invalid-backup.db')
 writeFileSync(invalidBackup, 'not a database')
