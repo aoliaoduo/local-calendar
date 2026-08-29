@@ -101,6 +101,7 @@ export default function EventDialog({ state, calendars, onClose, onSaved, onCrea
   const [reminderMinutes, setReminderMinutes] = useState(String(0))
   const [error, setError] = useState('')
   const [createTask, setCreateTask] = useState(false)
+  const [createKind, setCreateKind] = useState<'event' | 'task'>('event')
 
   if (!state) return null
   const detailed = state.mode === 'create' && state.detailed === true
@@ -115,9 +116,9 @@ export default function EventDialog({ state, calendars, onClose, onSaved, onCrea
     try {
       if (!editing && createTask) {
         if (!title.trim()) return
-        const dueAt = allDay ? start : start.slice(0, 10)
+        const dueAt = allDay ? start : DateTime.fromISO(start).toISO()!
         if (!onCreateTask) throw new Error('任务创建入口不可用')
-        await onCreateTask({ title: title.trim(), notes: description.trim(), dueAt, reminderMinutes: 900 })
+        await onCreateTask({ title: title.trim(), notes: description.trim(), dueAt, reminderMinutes: allDay ? 900 : 0 })
         onSaved('已创建任务')
         onClose()
         return
@@ -198,7 +199,10 @@ export default function EventDialog({ state, calendars, onClose, onSaved, onCrea
             if (e.key === 'Enter') void handleSave()
           }}
         />
-        {!editing && onCreateTask && <label className="create-kind"><input type="checkbox" checked={createTask} onChange={(event) => setCreateTask(event.target.checked)} /><span>创建为任务</span></label>}
+        {!editing && onCreateTask && <div className="create-kind" role="tablist" aria-label="创建类型">
+          <button type="button" className={createKind === 'event' ? 'active' : ''} onClick={() => { setCreateKind('event'); setCreateTask(false) }}><span className="material-icons">event</span>日程</button>
+          <button type="button" className={createKind === 'task' ? 'active' : ''} onClick={() => { setCreateKind('task'); setCreateTask(true) }}><span className="material-icons">check_circle</span>任务</button>
+        </div>}
 
         <div className="dlg-row">
           <span className="material-icons">schedule</span>

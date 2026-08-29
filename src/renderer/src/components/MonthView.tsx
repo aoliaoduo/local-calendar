@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { DateTime } from 'luxon'
 import { getLunarDayLabel } from '@shared/lunar'
-import { monthGrid, WEEKDAYS_SHORT } from '../dateUtils'
+import { monthGrid, weekdaysShort } from '../dateUtils'
 import type { CalendarInfo, EventInfo } from '../api'
 
 interface MonthViewProps {
@@ -12,10 +12,11 @@ interface MonthViewProps {
   onDayClick: (day: DateTime) => void
   onDayDetails: (day: DateTime) => void
   onEventMove: (id: string, start: DateTime, end: DateTime) => void
+  weekStart: 0 | 1
 }
 
-export default function MonthView({ anchor, events, calendars, onEventClick, onDayClick, onDayDetails, onEventMove }: MonthViewProps) {
-  const days = useMemo(() => monthGrid(anchor), [anchor.toISODate()])
+export default function MonthView({ anchor, events, calendars, onEventClick, onDayClick, onDayDetails, onEventMove, weekStart }: MonthViewProps) {
+  const days = useMemo(() => monthGrid(anchor, weekStart), [anchor.toISODate(), weekStart])
   const calById = useMemo(() => new Map(calendars.map((c) => [c.id, c])), [calendars])
   const today = DateTime.now()
   const gridRef = useRef<HTMLDivElement>(null)
@@ -97,7 +98,7 @@ export default function MonthView({ anchor, events, calendars, onEventClick, onD
   return (
     <div className="mo">
       <div className="mo-head">
-        {WEEKDAYS_SHORT.map((d) => (
+        {weekdaysShort(weekStart).map((d) => (
           <div key={d} className="dow">
             {d}
           </div>

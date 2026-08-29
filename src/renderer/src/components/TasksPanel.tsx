@@ -30,6 +30,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const [filter, setFilter] = useState<'all' | 'today' | 'overdue' | 'scheduled'>('all')
   const [sortMode, setSortMode] = useState<'manual' | 'due' | 'priority' | 'created'>('manual')
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const taskAddRef = useRef<HTMLDivElement>(null)
   const [editRrule, setEditRrule] = useState('')
 
   const load = async () => {
@@ -50,6 +51,21 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
     document.addEventListener('pointerdown', close)
     return () => document.removeEventListener('pointerdown', close)
   }, [moreOpen])
+
+  useEffect(() => {
+    if (!adding) return
+    const close = (event: PointerEvent) => {
+      if (!taskAddRef.current?.contains(event.target as Node)) {
+        setAdding(false)
+        setNewTitle('')
+        setNewDue(today)
+        setNewReminder('900')
+        setNewRrule('')
+      }
+    }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [adding, today])
 
   const handleAdd = async () => {
     const title = newTitle.trim()
@@ -95,7 +111,7 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
   const todayStr = DateTime.now().toISODate()
   const filteredOpen = visibleOpen.filter((task) => {
     if (filter === 'all') return true
-    if (!task.dueAt) return filter === 'scheduled' ? false : false
+    if (!task.dueAt) return false
     const date = DateTime.fromISO(task.dueAt).toLocal().toISODate()
     if (filter === 'today') return date === todayStr
     if (filter === 'overdue') return date! < todayStr!
@@ -275,10 +291,10 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
         <div className="task-filters" role="tablist" aria-label="任务筛选">
           {([['all', '全部'], ['today', '今天'], ['overdue', '逾期'], ['scheduled', '有日期']] as const).map(([key, label]) => <button key={key} className={filter === key ? 'active' : ''} onClick={() => setFilter(key)}>{label}</button>)}
         </div>
-        <label className="task-sort"><span>排序</span><select value={sortMode} onChange={(event) => setSortMode(event.target.value as typeof sortMode)}><option value="manual">手动顺序</option><option value="due">截止日期</option><option value="priority">优先级</option><option value="created">最近创建</option></select></label>
+        <label className="task-sort"><span className="material-icons">sort</span><span>排序</span><select value={sortMode} onChange={(event) => setSortMode(event.target.value as typeof sortMode)}><option value="manual">手动顺序</option><option value="due">截止日期</option><option value="priority">优先级</option><option value="created">最近创建</option></select></label>
         {selected.size > 0 && <div className="task-bulk-bar"><span>已选 {selected.size}</span><button className="btn-text compact" onClick={() => void batchComplete()}>完成</button><button className="btn-text compact danger" onClick={() => void batchDelete()}>删除</button><button className="icon-btn compact" title="清除选择" onClick={() => setSelected(new Set())}><span className="material-icons">close</span></button></div>}
         {adding ? (
-          <div className="task-add-form" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) { setAdding(false); setNewTitle(''); setNewDue(today); setNewReminder('900'); setNewRrule('') } }}>
+          <div ref={taskAddRef} className="task-add-form">
             <span className="task-add-check" />
             <input
               autoFocus

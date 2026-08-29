@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DateTime } from 'luxon'
 import { getLunarDayLabel } from '@shared/lunar'
-import { fmtEventTime, fmtHourLabel, WEEKDAYS_SHORT } from '../dateUtils'
+import { fmtEventTime, fmtHourLabel, weekdaysShort } from '../dateUtils'
 import type { CalendarInfo, EventInfo } from '../api'
 
 interface WeekViewProps {
@@ -14,6 +14,7 @@ interface WeekViewProps {
   onEventMove: (id: string, start: DateTime, end: DateTime) => void
   onRangeSelect: (start: DateTime, end: DateTime) => void
   onSlotDoubleClick: (day: DateTime, hour: number) => void
+  weekStart: 0 | 1
 }
 
 const HOUR_PX = 48
@@ -99,7 +100,8 @@ export default function WeekView({
   onDayNumClick,
   onEventMove,
   onRangeSelect,
-  onSlotDoubleClick
+  onSlotDoubleClick,
+  weekStart
 }: WeekViewProps) {
   const [now, setNow] = useState(() => DateTime.now())
   const [drag, setDrag] = useState<DragState | null>(null)
@@ -330,7 +332,7 @@ export default function WeekView({
           const lunar = getLunarDayLabel(d)
           return (
             <div key={d.toISODate()} className={`wk-day-head${isToday ? ' is-today' : ''}`}>
-              <div className="dow">{WEEKDAYS_SHORT[d.weekday % 7]}</div>
+              <div className="dow">{weekdaysShort(weekStart)[dates.indexOf(d)]}</div>
               <div className="dnum" onClick={() => onDayNumClick(d)}>
                 {d.day}
               </div>

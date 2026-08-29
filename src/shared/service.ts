@@ -565,8 +565,8 @@ export class CalendarService {
     const now = nowIso()
     const reminderMinutes = input.reminderMinutes !== undefined && input.reminderMinutes !== null
       ? normalizeTaskReminder(input.reminderMinutes)
-      : input.reminderMinutes === undefined && /^\d{4}-\d{2}-\d{2}$/.test(input.dueAt?.trim() || '')
-        ? 900
+      : input.reminderMinutes === undefined && input.dueAt
+        ? /^\d{4}-\d{2}-\d{2}$/.test(input.dueAt.trim()) ? 900 : 0
         : null
     const priority = normalizeTaskPriority(input.priority)
     this.db

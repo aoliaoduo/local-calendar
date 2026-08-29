@@ -32,6 +32,7 @@ interface TopBarProps {
   notifications: AppToastInfo[]
   onNotificationClick: (notification: AppToastInfo) => void
   onClearNotifications: () => void
+  onTransientDismiss?: () => void
 }
 
 const VIEW_LABEL: Record<ViewKind, string> = { day: '日', '4day': '4 天', week: '周', month: '月', year: '年', agenda: '日程' }
@@ -62,6 +63,7 @@ export default function TopBar({
   notifications,
   onNotificationClick,
   onClearNotifications
+  ,onTransientDismiss
 }: TopBarProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
@@ -106,7 +108,7 @@ export default function TopBar({
   }
 
   return (
-    <header className="topbar" onContextMenu={(event) => event.preventDefault()}>
+    <header className="topbar" onPointerDown={() => onTransientDismiss?.()} onContextMenu={(event) => event.preventDefault()}>
       <div className="window-drag-region" />
       <button className="icon-btn" title="主菜单" onClick={onToggleSidebar}>
         <span className="material-icons">menu</span>

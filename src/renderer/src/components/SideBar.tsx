@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { DateTime } from 'luxon'
-import { monthGrid, sameDay, WEEKDAYS_SHORT } from '../dateUtils'
+import { monthGrid, sameDay, weekdaysShort } from '../dateUtils'
 import type { CalendarInfo } from '../api'
 
 interface SideBarProps {
@@ -12,10 +12,11 @@ interface SideBarProps {
   onCreateCalendar: (name: string, color: string) => Promise<void>
   onEditCalendar: (calendar: CalendarInfo) => void
   onDeleteCalendar: (calendar: CalendarInfo) => void
+  weekStart: 0 | 1
   collapsed: boolean
 }
 
-export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, onToggleCalendar, onCreateCalendar, onEditCalendar, onDeleteCalendar, collapsed }: SideBarProps) {
+export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, onToggleCalendar, onCreateCalendar, onEditCalendar, onDeleteCalendar, weekStart, collapsed }: SideBarProps) {
   const [miniMonth, setMiniMonth] = useState(() => anchor.startOf('month'))
   const [showMyCals, setShowMyCals] = useState(true)
   const [showOtherCals, setShowOtherCals] = useState(true)
@@ -24,12 +25,26 @@ export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, o
   const [newCalendarColor, setNewCalendarColor] = useState('#1a73e8')
   const [calendarError, setCalendarError] = useState('')
   const [calendarMenuId, setCalendarMenuId] = useState<string | null>(null)
-  const days = monthGrid(miniMonth)
+  const calendarCreateRef = useRef<HTMLDivElement>(null)
+  const days = monthGrid(miniMonth, weekStart)
   const today = DateTime.now()
 
   useEffect(() => {
     if (miniMonth.year !== anchor.year || miniMonth.month !== anchor.month) setMiniMonth(anchor.startOf('month'))
   }, [anchor, miniMonth.year, miniMonth.month])
+
+  useEffect(() => {
+    if (!addingCalendar) return
+    const close = (event: PointerEvent) => {
+      if (!calendarCreateRef.current?.contains(event.target as Node)) {
+        setAddingCalendar(false)
+        setNewCalendarName('')
+        setCalendarError('')
+      }
+    }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [addingCalendar])
 
   const myCals = calendars.filter((c) => !['holidays'].includes(c.id))
   const otherCals = calendars.filter((c) => c.id === 'holidays')
@@ -47,6 +62,7 @@ export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, o
           <button className="danger" onClick={() => { setCalendarMenuId(null); onDeleteCalendar(cal) }}>删除日历</button>
         </div>}
       </>}
+      {(cal.id === 'personal' || cal.id === 'holidays') && <span className="cal-row-more-spacer" aria-hidden="true" />}
     </div>
   )
 
@@ -70,7 +86,7 @@ export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, o
           </div>
         </div>
         <div className="mm-grid">
-          {WEEKDAYS_SHORT.map((d) => (
+          {weekdaysShort(weekStart).map((d) => (
             <div key={d} className="mm-dow">
               {d.replace('周', '')}
             </div>
@@ -105,7 +121,7 @@ export default function SideBar({ calendars, anchor, onAnchorChange, onCreate, o
         </div>
       </div>
       {addingCalendar && (
-        <div className="sidebar-calendar-create" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) { setAddingCalendar(false); setNewCalendarName('') } }}>
+        <div ref={calendarCreateRef} className="sidebar-calendar-create">
           <input autoFocus placeholder="日历名称" value={newCalendarName} onChange={(event) => setNewCalendarName(event.target.value)} />
           <input className="settings-color" type="color" value={newCalendarColor} onChange={(event) => setNewCalendarColor(event.target.value)} />
           <button className="btn-text compact" disabled={!newCalendarName.trim()} onClick={() => void onCreateCalendar(newCalendarName, newCalendarColor).then(() => { setNewCalendarName(''); setAddingCalendar(false) }).catch((error) => setCalendarError(error instanceof Error ? error.message : '创建失败'))}>添加</button>

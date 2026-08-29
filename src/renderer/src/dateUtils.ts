@@ -2,6 +2,10 @@ import { DateTime } from 'luxon'
 
 export const WEEKDAYS_SHORT = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 
+export function weekdaysShort(weekStart: 0 | 1 = 0): string[] {
+  return weekStart === 0 ? WEEKDAYS_SHORT : [...WEEKDAYS_SHORT.slice(1), WEEKDAYS_SHORT[0]]
+}
+
 // Google Calendar 默认一周从周日开始
 export function startOfWeek(dt: DateTime): DateTime {
   return dt.startOf('week', { useLocaleWeeks: false }).minus({ days: 1 }).startOf('day')
@@ -14,9 +18,10 @@ export function weekDates(anchor: DateTime, weekStart: 0 | 1 = 0): DateTime[] {
   return Array.from({ length: 7 }, (_, i) => start.plus({ days: i }))
 }
 
-export function monthGrid(anchor: DateTime): DateTime[] {
+export function monthGrid(anchor: DateTime, weekStart: 0 | 1 = 0): DateTime[] {
   const first = anchor.startOf('month').startOf('day')
-  const start = first.minus({ days: first.weekday % 7 })
+  const offset = ((first.weekday % 7) - weekStart + 7) % 7
+  const start = first.minus({ days: offset })
   return Array.from({ length: 42 }, (_, i) => start.plus({ days: i }))
 }
 

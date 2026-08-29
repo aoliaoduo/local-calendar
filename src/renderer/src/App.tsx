@@ -376,6 +376,7 @@ export default function App() {
           }
         }}
         onClearNotifications={() => setNotifications([])}
+        onTransientDismiss={() => { if (dialog?.mode === 'create') setDialog(null) }}
         onSearchPick={(evt) => {
           setCursor(DateTime.fromISO(evt.startUtc) as DateTime<true>)
           setView('day')
@@ -397,6 +398,7 @@ export default function App() {
           onCreateCalendar={handleCalendarCreate}
           onEditCalendar={setCalendarToEdit}
           onDeleteCalendar={(calendar) => { void handleCalendarDelete(calendar.id) }}
+          weekStart={weekStart}
           collapsed={!sidebarOpen}
         />
 
@@ -410,9 +412,10 @@ export default function App() {
             onDayClick={(d) => setDialog({ mode: 'create', day: d, allDay: true })}
             onDayDetails={setAgendaDay}
             onEventMove={handleEventMove}
+            weekStart={weekStart}
           />
         ) : view === 'year' ? (
-          <YearView anchor={cursor} events={calendarEvents} calendars={displayCalendars} onMonthClick={(month) => { setCursor(month as DateTime<true>); setPreferredView('month') }} />
+          <YearView anchor={cursor} events={calendarEvents} calendars={displayCalendars} onMonthClick={(month) => { setCursor(month as DateTime<true>); setPreferredView('month') }} weekStart={weekStart} />
         ) : view === 'agenda' ? (
           <AgendaView anchor={cursor} events={calendarEvents} calendars={displayCalendars} onEventClick={openEvent} />
         ) : (
@@ -429,6 +432,7 @@ export default function App() {
             onEventMove={handleEventMove}
             onRangeSelect={(start, end) => setDialog({ mode: 'create', day: start.startOf('day'), start, end })}
             onSlotDoubleClick={(day, hour) => setDialog({ mode: 'create', day, hour, detailed: true })}
+            weekStart={weekStart}
           />
         )}
       </main>

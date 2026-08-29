@@ -80,7 +80,7 @@
 
 .year-month:hover {
   border-color: var(--g-blue);
-  box-shadow: 0 3px 10px rgba(60, 64, 67, 0.12);
+  box-shadow: var(--panel-shadow);
   transform: translateY(-2px);
 }
 
@@ -608,7 +608,7 @@
   overflow: hidden;
   border-radius: 16px;
   background: #fff;
-  box-shadow: 0 24px 38px 3px rgba(0, 0, 0, 0.14), 0 9px 46px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--dialog-shadow);
   animation: dialog-enter 0.18s ease-out;
 }
 
@@ -703,7 +703,7 @@
   overflow: hidden;
   border-radius: 18px;
   background: #fff;
-  box-shadow: 0 24px 70px rgba(22, 48, 86, 0.28);
+  box-shadow: var(--dialog-shadow);
   animation: dialog-enter 0.18s ease-out;
 }
 
@@ -720,7 +720,7 @@
   width: min(460px, calc(100vw - 32px));
   background: #fff;
   border-radius: 18px;
-  box-shadow: 0 24px 70px rgba(22, 48, 86, 0.28);
+  box-shadow: var(--dialog-shadow);
   animation: dialog-enter 0.18s ease-out;
 }
 
@@ -939,7 +939,7 @@
   overflow-y: auto;
   background: #fff;
   border-radius: 18px;
-  box-shadow: 0 24px 70px rgba(22, 48, 86, 0.28);
+  box-shadow: var(--dialog-shadow);
   padding: 22px 26px 16px;
   animation: dialog-enter 0.18s ease-out;
 }
@@ -991,8 +991,7 @@
   overflow-y: auto;
   background: #fff;
   border-radius: 8px;
-  box-shadow: 0 24px 38px 3px rgba(0, 0, 0, 0.14), 0 9px 46px 8px rgba(0, 0, 0, 0.12),
-    0 11px 15px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--dialog-shadow);
   padding: 24px 24px 8px;
 }
 
@@ -1021,6 +1020,34 @@
 .dlg-title::placeholder {
   color: var(--text-3);
 }
+
+.create-kind {
+  display: inline-flex;
+  gap: 4px;
+  margin: 0 0 14px 38px;
+  padding: 3px;
+  border-radius: 18px;
+  background: var(--blue-soft);
+}
+
+.create-kind button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 15px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.create-kind button.active {
+  background: var(--surface);
+  color: var(--g-blue-text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .16);
+}
+
+.create-kind .material-icons { font-size: 17px; }
 
 .dlg-row {
   display: flex;
@@ -1314,7 +1341,7 @@
   background: #fff;
   border-radius: 16px;
   padding: 20px 24px 12px;
-  box-shadow: 0 24px 70px rgba(22, 48, 86, 0.28);
+  box-shadow: var(--dialog-shadow);
   animation: dialog-enter 0.18s ease-out;
 }
 
@@ -1457,6 +1484,8 @@
   background: transparent;
   color: var(--text-2);
 }
+
+.task-sort > .material-icons { font-size: 17px; color: var(--g-blue); }
 
 .task-bulk-bar {
   display: flex;
@@ -1726,7 +1755,9 @@
   font-size: 12px;
   color: var(--text-3);
   margin-top: 2px;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .task-del {

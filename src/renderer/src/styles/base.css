@@ -18,6 +18,7 @@
   --danger: #d93025;
   --surface: #f8fafd;
   --panel-shadow: 0 2px 8px rgba(22, 48, 86, 0.12);
+  --dialog-shadow: 0 16px 48px rgba(22, 48, 86, 0.24);
   --font: 'Roboto', 'Microsoft YaHei', 'PingFang SC', sans-serif;
 }
 
@@ -34,6 +35,7 @@
   --hover: #141d2b;
   --blue-soft: #172943;
   --panel-shadow: 0 2px 10px rgba(0, 0, 0, 0.42);
+  --dialog-shadow: 0 16px 48px rgba(0, 0, 0, 0.58);
 }
 
 :root[data-theme='dark'] *::-webkit-scrollbar-thumb {
@@ -950,6 +952,18 @@ select {
   opacity: 0;
 }
 
+.cal-row-more-spacer {
+  width: 32px;
+  height: 32px;
+  margin-right: 4px;
+  flex: 0 0 32px;
+}
+
+.cal-row-wrap .cal-row-more,
+.cal-row-wrap .cal-row-more-spacer {
+  margin-left: 0;
+}
+
 .cal-row-wrap:hover .cal-row-more,
 .cal-row-more:focus {
   opacity: 1;
@@ -1100,7 +1114,7 @@ select {
   overflow-y: auto;
   background: #fff;
   border-radius: 16px;
-  box-shadow: 0 24px 38px 3px rgba(0, 0, 0, 0.14), 0 9px 46px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--dialog-shadow);
   padding: 20px 24px 16px;
 }
 
