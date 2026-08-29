@@ -244,6 +244,7 @@
   overflow-y: auto;
   position: relative;
   background: #fff;
+  padding-top: 18px;
 }
 
 .wk-grid {
@@ -268,6 +269,9 @@
   transform: translateY(-8px);
   pointer-events: none;
 }
+
+/* The midnight label sits on the boundary below the all-day lane; keep it in the time grid. */
+.wk-times .h-label:first-child { transform: translateY(-8px); }
 
 .wk-cols {
   position: relative;

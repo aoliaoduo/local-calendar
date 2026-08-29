@@ -154,19 +154,8 @@ export default function App() {
   }, [loadBootstrap])
 
   useEffect(() => window.calendarApi.onTitlebarPointerDown(() => {
-    setDialog(null)
-    setTaskToEdit(null)
-    setTaskOccurrenceIndex(undefined)
-    setTaskOccurrenceDue(undefined)
-    setCalendarToEdit(null)
-    setProfileOpen(false)
-    setAgendaDay(null)
-    setSettingsOpen(false)
-    setAppearanceOpen(false)
-    setHelpOpen(false)
-    setRecycleOpen(false)
-    document.dispatchEvent(new Event('calendar-transient-dismiss'))
-  }), [dialog])
+    dismissTransient()
+  }), [])
 
   useEffect(() => window.calendarApi.onAppToast((payload) => {
     const item: AppToastInfo = typeof payload === 'string' ? { message: payload } : payload
@@ -215,6 +204,21 @@ export default function App() {
     if (nextAvatarImage) localStorage.setItem('local-calendar.avatar-image', nextAvatarImage)
     else localStorage.removeItem('local-calendar.avatar-image')
     void window.calendarApi.setProfile({ username: normalizedName, avatarColor: nextAvatarColor, avatarImage: nextAvatarImage })
+  }
+
+  const dismissTransient = () => {
+    setDialog(null)
+    setTaskToEdit(null)
+    setTaskOccurrenceIndex(undefined)
+    setTaskOccurrenceDue(undefined)
+    setCalendarToEdit(null)
+    setProfileOpen(false)
+    setAgendaDay(null)
+    setSettingsOpen(false)
+    setAppearanceOpen(false)
+    setHelpOpen(false)
+    setRecycleOpen(false)
+    document.dispatchEvent(new Event('calendar-transient-dismiss'))
   }
 
   const dates = useMemo(() => {
@@ -407,7 +411,7 @@ export default function App() {
           }
         }}
         onClearNotifications={() => setNotifications([])}
-        onTransientDismiss={() => { if (dialog?.mode === 'create') setDialog(null) }}
+        onTransientDismiss={dismissTransient}
         onSearchPick={(evt) => {
           setCursor(DateTime.fromISO(evt.startUtc) as DateTime<true>)
           setView('day')
