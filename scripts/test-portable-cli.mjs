@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -7,6 +7,8 @@ import { spawnSync } from 'node:child_process'
 const dataDir = mkdtempSync(join(tmpdir(), 'local-calendar-portable-cli-test-'))
 const electron = resolve('node_modules/electron/dist/electron.exe')
 const cli = resolve('out/main/cli.js')
+assert.equal(existsSync(electron), true, `Electron binary is missing: ${electron}`)
+assert.equal(existsSync(cli), true, `Built CLI is missing: ${cli}`)
 
 function runPortableCli(dataDir, extraArgs = []) {
   return spawnSync(electron, [...extraArgs, cli, '--data-dir', dataDir, 'doctor', '--json'], {

@@ -13,8 +13,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: npm
       - run: npm ci
+      - name: Verify Electron binary
+        shell: pwsh
+        run: |
+          $electron = Join-Path (Resolve-Path 'node_modules/electron') 'dist/electron.exe'
+          if (-not (Test-Path -LiteralPath $electron)) {
+            throw "Electron binary is missing: $electron"
+          }
+          & $electron --version
       - run: npm run typecheck
       - run: npm test
