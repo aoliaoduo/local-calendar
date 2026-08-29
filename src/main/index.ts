@@ -9,7 +9,7 @@ import { createMethodTable } from '../shared/rpc-methods'
 import { getDbPath, getRpcInfoPath, getDataDir } from '../shared/paths'
 import type { Task } from '../shared/types'
 import { isReminderDue } from '../shared/reminders'
-import { existsSync, copyFileSync, readFileSync, writeFileSync, renameSync, mkdirSync, rmSync, readdirSync, statSync, unlinkSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync, rmSync, readdirSync, statSync, unlinkSync } from 'node:fs'
 
 const windowStatePath = () => join(getDataDir(), 'window-state.json')
 const preferencesPath = () => join(getDataDir(), 'preferences.json')
@@ -33,7 +33,19 @@ function readNotificationPreferences(): NotificationPreferences {
 }
 interface WindowState { x?: number; y?: number; width?: number; height?: number; maximized?: boolean }
 function readWindowState(): WindowState {
-  try { return JSON.parse(readFileSync(windowStatePath(), 'utf8')) as WindowState } catch { return {} }
+  try {
+    const value = JSON.parse(readFileSync(windowStatePath(), 'utf8')) as Partial<WindowState>
+    const finite = (input: unknown): input is number => typeof input === 'number' && Number.isFinite(input)
+    return {
+      ...(finite(value.x) ? { x: Math.round(value.x) } : {}),
+      ...(finite(value.y) ? { y: Math.round(value.y) } : {}),
+      ...(finite(value.width) && value.width >= 760 && value.width <= 10000 ? { width: Math.round(value.width) } : {}),
+      ...(finite(value.height) && value.height >= 520 && value.height <= 10000 ? { height: Math.round(value.height) } : {}),
+      ...(typeof value.maximized === 'boolean' ? { maximized: value.maximized } : {})
+    }
+  } catch {
+    return {}
+  }
 }
 function saveWindowState(win: BrowserWindow): void {
   try {
@@ -62,15 +74,8 @@ function configurePortableStorage(): void {
     ? process.env.PORTABLE_EXECUTABLE_DIR?.trim() || dirname(process.execPath)
     : process.cwd()
   const dataDir = join(executableDir, 'data')
-  const legacyDir = join(process.env.APPDATA || '', 'local-calendar')
-  if (!existsSync(join(dataDir, 'calendar.db')) && existsSync(join(legacyDir, 'calendar.db'))) {
-    mkdirSync(dataDir, { recursive: true })
-    copyFileSync(join(legacyDir, 'calendar.db'), join(dataDir, 'calendar.db'))
-    for (const suffix of ['-wal', '-shm']) {
-      if (existsSync(join(legacyDir, `calendar.db${suffix}`))) copyFileSync(join(legacyDir, `calendar.db${suffix}`), join(dataDir, `calendar.db${suffix}`))
-    }
-  }
   process.env.LOCAL_CALENDAR_DATA_DIR = dataDir
+  getDataDir()
   app.setPath('userData', dataDir)
   app.setPath('sessionData', join(dataDir, 'session'))
   app.setPath('logs', join(dataDir, 'logs'))
