@@ -67,6 +67,11 @@ END:VCALENDAR`)
   assert.equal(resolve(report.dataDir), resolve(dataDir))
   assert.equal(report.databaseExists, true)
   assert.equal(report.appRunning, false)
+
+  const alternateDataDir = join(dataDir, 'second-portable', 'data')
+  const alternateReport = runJson('--data-dir', alternateDataDir, 'doctor')
+  assert.equal(resolve(alternateReport.dataDir), resolve(alternateDataDir))
+  assert.equal(alternateReport.dataSource, '--data-dir')
 } finally {
   rmSync(dataDir, { recursive: true, force: true })
 }

@@ -1,5 +1,5 @@
 import { readFileSync, existsSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import { DateTime } from 'luxon'
 import { getDataDir, getDbPath, getRpcInfoPath, type RpcInfo } from '../shared/paths'
 import { openDatabase } from '../shared/db'
@@ -8,9 +8,19 @@ import { createMethodTable, type MethodTable } from '../shared/rpc-methods'
 import { parseIcsEvents } from '../shared/ics'
 import type { Calendar, CalendarEvent, Task } from '../shared/types'
 
+const cliDataDir = readCliDataDir(process.argv.slice(2))
+if (cliDataDir) process.env.LOCAL_CALENDAR_DATA_DIR = resolve(cliDataDir)
+
 if (!process.env.LOCAL_CALENDAR_PACKAGE_DIR && process.argv[1]) {
   process.env.LOCAL_CALENDAR_PACKAGE_DIR = dirname(dirname(dirname(process.argv[1])))
   process.env.LOCAL_CALENDAR_CLI_LOCAL = '1'
+}
+
+function readCliDataDir(argv: string[]): string | undefined {
+  const index = argv.indexOf('--data-dir')
+  if (index < 0) return undefined
+  const value = argv[index + 1]
+  return value && !value.startsWith('-') ? value : undefined
 }
 
 class CliError extends Error {}
@@ -52,6 +62,7 @@ const HELP = `本地日历 CLI — 操作 Local Calendar 的日程与待办
   help                                显示本帮助
 
 通用:
+  --data-dir 目录                       使用指定的数据目录（多个便携包时必填）
   --json                              以 JSON 输出（便于程序与 AI 解析）
 
 时间格式: ISO 8601（本地时区），如 2026-08-28T14:00；纯日期 2026-08-28 视为全天。
@@ -127,7 +138,7 @@ const SHORT_TO_LONG: Record<string, string> = {
   o: 'out',
   i: 'in'
 }
-const VALUE_FLAGS = new Set(['start', 'end', 'calendar', 'location', 'note', 'due', 'from', 'to', 'title', 'repeat', 'remind', 'priority', 'out', 'in'])
+const VALUE_FLAGS = new Set(['start', 'end', 'calendar', 'location', 'note', 'due', 'from', 'to', 'title', 'repeat', 'remind', 'priority', 'out', 'in', 'data-dir'])
 const BOOL_FLAGS = new Set(['all-day', 'all', 'done', 'today', 'overdue', 'scheduled', 'json', 'help'])
 
 const REPEAT_MAP: Record<string, string> = {
@@ -581,6 +592,7 @@ async function cmdDoctor(backend: Backend, json: boolean): Promise<void> {
   const events = await backend.call<CalendarEvent[]>('events.list', {})
   const report = {
     dataDir: getDataDir(),
+    dataSource: cliDataDir ? '--data-dir' : process.env.LOCAL_CALENDAR_DATA_DIR ? 'LOCAL_CALENDAR_DATA_DIR' : process.env.LOCAL_CALENDAR_PACKAGE_DIR ? '命令所在包目录' : '当前工作目录',
     database: getDbPath(),
     databaseExists: existsSync(getDbPath()),
     appRunning: probeApp() !== null,
@@ -604,6 +616,7 @@ async function main(): Promise<void> {
     return
   }
   const { flags, positional } = parseArgs(argv)
+  if (flags['data-dir'] !== undefined && !str(flags, 'data-dir')) throw new CliError('--data-dir 需要提供数据目录路径')
   if (flags.help === true) {
     console.log(HELP)
     return
