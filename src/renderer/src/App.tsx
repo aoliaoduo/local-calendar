@@ -154,7 +154,13 @@ export default function App() {
   }, [loadBootstrap])
 
   useEffect(() => window.calendarApi.onTitlebarPointerDown(() => {
-    if (dialog?.mode === 'create') setDialog(null)
+    setDialog(null)
+    setTaskToEdit(null)
+    setTaskOccurrenceIndex(undefined)
+    setTaskOccurrenceDue(undefined)
+    setCalendarToEdit(null)
+    setProfileOpen(false)
+    setAgendaDay(null)
     document.dispatchEvent(new Event('calendar-transient-dismiss'))
   }), [dialog])
 

@@ -178,7 +178,11 @@ export default function TasksPanel({ onClose, onToast }: TasksPanelProps) {
         else groups[3].items.push(task)
       }
     }
-    return groups.filter((group) => group.items.length > 0).map((group) => ({ ...group, items: groupSort(group.items) }))
+    const rank = new Map(groups.map((group, index) => [group.key, index]))
+    return groups
+      .filter((group) => group.items.length > 0)
+      .sort((first, second) => (rank.get(first.key) ?? 0) - (rank.get(second.key) ?? 0))
+      .map((group) => ({ ...group, items: groupSort(group.items) }))
   }
 
   const handleDrop = async (targetId: string) => {

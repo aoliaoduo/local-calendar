@@ -163,6 +163,7 @@ select {
   border-bottom: none;
   z-index: 20;
   gap: 4px;
+  -webkit-app-region: drag;
 }
 
 :root[data-theme='dark'] .wk,
@@ -193,14 +194,6 @@ select {
 
 .window-drag-region {
   display: none;
-}
-
-.topbar::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  -webkit-app-region: drag;
-  z-index: 0;
 }
 
 .topbar > *:not(.window-drag-region) {
