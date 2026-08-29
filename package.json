@@ -11,6 +11,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "typecheck": "tsc -b --pretty false",
+    "postinstall": "node node_modules/electron/install.js",
     "test": "npm run build && node --experimental-strip-types scripts/test-service.mjs && node scripts/test-cli.mjs && node scripts/test-portable-cli.mjs",
     "test:cli": "npm run build && node scripts/test-cli.mjs",
     "dist:win": "npm run build && electron-builder --win zip",

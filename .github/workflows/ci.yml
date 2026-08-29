@@ -16,6 +16,8 @@ jobs:
           node-version: 22.12.0
           cache: npm
       - run: npm ci
+      - name: Install Electron binary
+        run: node node_modules/electron/install.js
       - name: Verify Electron binary
         shell: pwsh
         run: |
